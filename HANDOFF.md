@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Split-screen ad layout + 5-minute interval  
+> **Last change:** Real map tiles added (CartoDB dark via Leaflet.js)  
 > **Repo:** https://github.com/marcboy/transitmap
 
 ---
