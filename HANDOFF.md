@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Fix: map tiles restored — Leaflet init moved inside window.load so container is sized first
+> **Last change:** NYC all lines expanded; Seattle 1 Line=red, 2 Line=blue
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
@@ -208,6 +208,8 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | NYC: all 23 lines with full route paths added |
+| 2026-05-26 | Seattle: 1 Line=red, 2 Line=blue (correct Sound Transit colors) |
 | 2026-05-26 | Fix: city map tiles disappeared — Leaflet invalidateSize + window.load init |
 | 2026-05-26 | Paris: all 16 lines added (M1-M14 incl. 3b, 7b) with full station coords |
 | 2026-05-26 | Map brightness fixed: dark_matter_lite tiles + tint reduced 0.55→0.18 |
