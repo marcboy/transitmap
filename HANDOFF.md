@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** NYC all lines expanded; Seattle 1 Line=red, 2 Line=blue
+> **Last change:** Tokyo added (all 13 lines); version stamp; train density increased
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
@@ -208,6 +208,9 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | Tokyo: all 13 subway lines (Tokyo Metro + Toei) |
+| 2026-05-26 | Version stamp + edit time shown next to clock |
+| 2026-05-26 | Train density: 5-8 per route (was 3-7) |
 | 2026-05-26 | NYC: all 23 lines with full route paths added |
 | 2026-05-26 | Seattle: 1 Line=red, 2 Line=blue (correct Sound Transit colors) |
 | 2026-05-26 | Fix: city map tiles disappeared — Leaflet invalidateSize + window.load init |
