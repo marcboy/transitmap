@@ -98,8 +98,8 @@ enum CityConfig {
         id: "seattle",
         name: "Seattle",
         country: "US",
-        center: Coordinate(lat: 47.603, lng: -122.329),
-        defaultZoom: 12,
+        center: Coordinate(lat: 47.620, lng: -122.250),
+        defaultZoom: 11,
         feeds: [
             // Sound Transit OneBusAway GTFS-RT
             // Request free API key: email oba_api_key@soundtransit.org
@@ -107,13 +107,12 @@ enum CityConfig {
                 id: "sound-transit",
                 url: "https://api.pugetsound.onebusaway.org/api/gtfs_realtime/vehicle-positions-for-agency/40.pb",
                 apiKey: "YOUR_OBA_API_KEY",
-                apiKeyHeader: "key"   // passed as query param ?key=
+                apiKeyHeader: "key"
             ),
         ],
         lines: [
-            LineInfo(id: "1-Line", name: "1 Line", color: "#0091DA"), // Blue — Lynnwood to Federal Way
-            LineInfo(id: "2-Line", name: "2 Line", color: "#53B0E3"), // Light Blue — Redmond to Downtown
-            LineInfo(id: "T-Line", name: "T Line", color: "#E31837"), // Red — Tacoma Link
+            LineInfo(id: "1-Line", name: "1 Line", color: "#0091DA"), // Blue — Lynnwood ↔ Federal Way
+            LineInfo(id: "2-Line", name: "2 Line", color: "#53B0E3"), // Light blue — Redmond ↔ Westlake via I-90
         ]
     )
 
