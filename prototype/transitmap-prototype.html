@@ -978,23 +978,12 @@ const CITIES = {
     ],
   };
 
-// ── LEAFLET MAP SETUP ─────────────────────────────────────────
+// ── LEAFLET MAP SETUP — deferred until DOM is fully sized ────
 
-// Lighter dark CartoDB tiles — streets visible, not pitch black
 const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_matter_lite/{z}/{x}/{y}{r}.png';
 
-let leafletMap = L.map('leaflet-map', {
-  zoomControl:        false,
-  attributionControl: false,
-  dragging:           true,
-  scrollWheelZoom:    true,
-  doubleClickZoom:    false,
-});
-
-L.tileLayer(TILE_URL, { maxZoom: 19 }).addTo(leafletMap);
-
-// Route polylines layer group
-let routeLayer = L.layerGroup().addTo(leafletMap);
+let leafletMap   = null;
+let routeLayer   = null;
 
 // ── TRAIN CANVAS (overlays the map) ──────────────────────────
 
@@ -1017,6 +1006,7 @@ let trains  = [];
 // ── DRAW ROUTES AS LEAFLET POLYLINES ─────────────────────────
 
 function drawRoutes() {
+  if (!routeLayer) return;
   routeLayer.clearLayers();
   const cfg = CITIES[cityId];
 
@@ -1109,6 +1099,7 @@ function stepTrains(dt) {
 function drawTrains() {
   const w = trainCanvas.width, h = trainCanvas.height;
   tCtx.clearRect(0, 0, w, h);
+  if (!leafletMap) return;
 
   trains.forEach(tr => {
     const [lat, lng] = trainLatLng(tr);
@@ -1277,9 +1268,21 @@ function closeAd() {
 // ── INIT ──────────────────────────────────────────────────────
 
 window.addEventListener('load', () => {
+  // Build Leaflet AFTER the DOM is painted and sized — this is critical
+  leafletMap = L.map('leaflet-map', {
+    zoomControl:        false,
+    attributionControl: false,
+    dragging:           true,
+    scrollWheelZoom:    true,
+    doubleClickZoom:    false,
+  });
+
+  L.tileLayer(TILE_URL, { maxZoom: 19 }).addTo(leafletMap);
+  routeLayer = L.layerGroup().addTo(leafletMap);
+
   const cfg0 = CITIES[cityId];
-  leafletMap.invalidateSize();
   leafletMap.setView(cfg0.center, cfg0.zoom);
+
   drawRoutes();
   spawnTrains();
   renderLegend();
