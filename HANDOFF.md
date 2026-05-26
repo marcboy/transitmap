@@ -1,8 +1,9 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Seattle 1 Line + 2 Line connected via shared downtown tunnel and I-90 bridge
-> **Repo:** https://github.com/marcboy/transitmap
+> **Last change:** Prototype hosted on GitHub Pages
+> **Repo:** https://github.com/marcboy/transitmap  
+> **Live Prototype:** https://marcboy.github.io/transitmap/
 
 ---
 
@@ -207,6 +208,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | Prototype hosted on GitHub Pages: https://marcboy.github.io/transitmap/ |
 | 2026-05-26 | Seattle: fixed 2 Line path via I-90 bridge + shared downtown tunnel stations with 1 Line | |
 | 2026-05-26 | Removed Cloudflare dependency — direct feed fetching on-device |
 | 2026-05-26 | Added `Config/CityConfig.swift` — all city config on-device |
