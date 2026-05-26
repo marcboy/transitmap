@@ -48,11 +48,11 @@
   .leaflet-control-attribution { display: none; }
   .leaflet-control-zoom { display: none; }
 
-  /* Dark overlay on top of tiles to darken + tint them */
+  /* Subtle tint — just enough to make train lines pop */
   #map-tint {
     position: absolute;
     inset: 0;
-    background: rgba(4, 8, 18, 0.55);
+    background: rgba(4, 8, 18, 0.18);
     pointer-events: none;
     z-index: 399;
   }
@@ -632,8 +632,8 @@ const CITIES = {
 
 // ── LEAFLET MAP SETUP ─────────────────────────────────────────
 
-// Dark CartoDB tiles — no API key required
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+// Lighter dark CartoDB tiles — streets visible, not pitch black
+const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_matter_lite/{z}/{x}/{y}{r}.png';
 
 let leafletMap = L.map('leaflet-map', {
   zoomControl:        false,
