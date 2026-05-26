@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TransitMap — Ambient Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080c14;
+    --surface: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.07);
+    --text: #e8edf5;
+    --muted: rgba(255,255,255,0.35);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  #map {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  canvas {
+    position: absolute;
+    top: 0; left: 0;
+    display: block;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 24px 32px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    background: linear-gradient(to bottom, rgba(8,12,20,0.92) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .city-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #fff;
+    line-height: 1;
+  }
+
+  .city-sub {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  .pulse-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px #4ade80;
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%,100% { opacity:1; } 50% { opacity:0.3; }
+  }
+
+  /* CITY SWITCHER */
+  .city-switcher {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 20;
+    background: rgba(8,12,20,0.85);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 5px;
+    backdrop-filter: blur(12px);
+  }
+
+  .city-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 7px 18px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    background: transparent;
+    transition: all 0.25s;
+    letter-spacing: 0.3px;
+  }
+
+  .city-btn.active {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+  }
+
+  .city-btn:hover:not(.active) { color: rgba(255,255,255,0.65); }
+
+  /* BOTTOM */
+  .legend {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 28px 32px;
+    background: linear-gradient(to top, rgba(8,12,20,0.92) 0%, transparent 100%);
+    z-index: 10;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+
+  .lines-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    max-width: 70%;
+  }
+
+  .line-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px 4px 6px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+  }
+
+  .line-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .clock-time {
+    font-family: 'Syne', sans-serif;
+    font-size: 38px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+    letter-spacing: -1px;
+    line-height: 1;
+    text-align: right;
+  }
+
+  .clock-date {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 4px;
+    text-align: right;
+  }
+
+  .train-count {
+    position: absolute;
+    bottom: 110px;
+    right: 32px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-align: right;
+    z-index: 10;
+    text-transform: uppercase;
+  }
+
+  .train-count span {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.55);
+    display: block;
+    line-height: 1;
+  }
+
+  /* ── SPLIT-SCREEN AD ── */
+
+  /* Shrinks the map to left half */
+  #map.ad-active { width: 50%; }
+
+  /* Also shrink the UI overlays that sit on the map */
+  .topbar, .legend, .train-count, .city-switcher {
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1),
+                right  0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  .ad-active-ui .topbar,
+  .ad-active-ui .legend { right: 50%; }
+  .ad-active-ui .city-switcher { left: 25%; }
+  .ad-active-ui .train-count   { right: calc(50% + 32px); }
+
+  /* Ad panel slides in from the right */
+  .ad-panel {
+    position: absolute;
+    top: 0; right: 0;
+    width: 50%; height: 100%;
+    background: #0d1120;
+    border-left: 1px solid rgba(255,255,255,0.08);
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 48px 44px;
+    transform: translateX(100%);
+    transition: transform 0.6s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+  }
+
+  .ad-panel.visible {
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .ad-panel-inner {
+    max-width: 420px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .ad-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 36px;
+  }
+
+  .ad-label {
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.22);
+  }
+
+  .ad-skip {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.2s;
+    font-family: 'DM Mono', monospace;
+  }
+  .ad-skip:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+
+  .ad-image-placeholder {
+    width: 100%;
+    aspect-ratio: 16/7;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #1e2d4a 0%, #2a1640 50%, #1a2d1a 100%);
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .ad-image-placeholder::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 30% 50%, rgba(80,140,255,0.15) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 50%, rgba(180,80,255,0.1) 0%, transparent 60%);
+  }
+
+  .ad-img-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+    z-index: 1;
+  }
+
+  .ad-brand {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.32);
+    margin-bottom: 10px;
+  }
+
+  .ad-headline {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(22px, 3vw, 34px);
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 14px;
+  }
+
+  .ad-body {
+    font-size: 13px;
+    color: rgba(255,255,255,0.42);
+    line-height: 1.65;
+    margin-bottom: 28px;
+  }
+
+  .ad-cta {
+    display: inline-block;
+    padding: 12px 28px;
+    background: #fff;
+    color: #080c14;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    transition: opacity 0.2s;
+    margin-bottom: 28px;
+  }
+  .ad-cta:hover { opacity: 0.85; }
+
+  .ad-timer-bar {
+    height: 2px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .ad-timer-fill {
+    height: 100%;
+    background: rgba(255,255,255,0.3);
+    transform-origin: left;
+    border-radius: 1px;
+  }
+
+  .ad-divider {
+    position: absolute;
+    top: 0; left: 50%;
+    width: 1px; height: 100%;
+    background: rgba(255,255,255,0.06);
+    z-index: 91;
+    transform: scaleX(0);
+    transition: transform 0.6s cubic-bezier(0.4,0,0.2,1) 0.3s;
+  }
+  .ad-divider.visible { transform: scaleX(1); }
+
+  /* CITY FADE */
+  .fade-cover {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+  }
+
+  .fade-cover.active { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="map">
+  <canvas id="mapCanvas"></canvas>
+  <canvas id="trainCanvas"></canvas>
+</div>
+
+<div class="city-switcher">
+  <button class="city-btn active" onclick="switchCity('nyc',this)">🇺🇸 New York</button>
+  <button class="city-btn"        onclick="switchCity('paris',this)">🇫🇷 Paris</button>
+</div>
+
+<div class="topbar">
+  <div>
+    <div class="city-name" id="cityName">New York City</div>
+    <div class="city-sub">Live Subway · <span id="trainCountInline">—</span> trains active</div>
+  </div>
+  <div class="status-pill">
+    <div class="pulse-dot"></div>
+    <span id="statusLabel">Connecting…</span>
+  </div>
+</div>
+
+<div class="train-count">
+  <span id="trainCountBig">—</span>trains
+</div>
+
+<div class="legend">
+  <div class="lines-row" id="linesRow"></div>
+  <div>
+    <div class="clock-time" id="clockTime">--:--</div>
+    <div class="clock-date" id="clockDate">---</div>
+  </div>
+</div>
+
+<!-- Split-screen ad panel -->
+<div class="ad-divider" id="adDivider"></div>
+<div class="ad-panel" id="adPanel">
+  <div class="ad-panel-inner">
+    <div class="ad-top-row">
+      <div class="ad-label">Advertisement</div>
+      <div class="ad-skip" onclick="closeAd()">&#10005; Dismiss</div>
+    </div>
+    <div class="ad-image-placeholder">
+      <div class="ad-img-text">Ad Creative</div>
+    </div>
+    <div class="ad-brand">Sponsored</div>
+    <div class="ad-headline">Explore NYC<br>Like Never Before</div>
+    <div class="ad-body">Discover hidden gems across all five boroughs with local guides curated by real New Yorkers.</div>
+    <div class="ad-cta">Learn More</div>
+    <div class="ad-timer-bar">
+      <div class="ad-timer-fill" id="adTimerFill"></div>
+    </div>
+  </div>
+</div>
+
+<div class="fade-cover" id="fadeCover"></div>
+
+<script>
+// ── DATA — use plain ASCII minus signs ────────────────────────
+
+const CITIES = {
+  nyc: {
+    name: 'New York City',
+    bounds: { minLat: 40.60, maxLat: 40.85, minLng: -74.05, maxLng: -73.75 },
+    lines: [
+      { id:'1', name:'1', color:'#EE352E' },
+      { id:'2', name:'2', color:'#EE352E' },
+      { id:'3', name:'3', color:'#EE352E' },
+      { id:'4', name:'4', color:'#00933C' },
+      { id:'5', name:'5', color:'#00933C' },
+      { id:'6', name:'6', color:'#00933C' },
+      { id:'7', name:'7', color:'#B933AD' },
+      { id:'A', name:'A', color:'#2850AD' },
+      { id:'C', name:'C', color:'#2850AD' },
+      { id:'E', name:'E', color:'#2850AD' },
+      { id:'B', name:'B', color:'#FF6319' },
+      { id:'F', name:'F', color:'#FF6319' },
+      { id:'G', name:'G', color:'#6CBE45' },
+      { id:'J', name:'J', color:'#996633' },
+      { id:'L', name:'L', color:'#A7A9AC' },
+      { id:'N', name:'N', color:'#FCCC0A' },
+      { id:'Q', name:'Q', color:'#FCCC0A' },
+      { id:'R', name:'R', color:'#FCCC0A' },
+    ],
+    routes: [
+      { id:'1', color:'#EE352E', path:[
+        [40.748,-74.002],[40.754,-73.990],[40.758,-73.981],
+        [40.769,-73.982],[40.776,-73.983],[40.787,-73.980],
+        [40.804,-73.968],[40.820,-73.952],[40.838,-73.941]
+      ]},
+      { id:'A', color:'#2850AD', path:[
+        [40.677,-73.935],[40.689,-73.943],[40.702,-73.951],
+        [40.718,-74.002],[40.730,-74.007],[40.748,-74.002],
+        [40.754,-73.990],[40.763,-73.982],[40.776,-73.946],
+        [40.793,-73.944],[40.814,-73.943]
+      ]},
+      { id:'4', color:'#00933C', path:[
+        [40.641,-73.944],[40.655,-73.936],[40.668,-73.930],
+        [40.683,-73.921],[40.700,-73.907],[40.714,-73.908],
+        [40.726,-73.898],[40.742,-73.889],[40.751,-73.883],
+        [40.763,-73.872],[40.779,-73.863]
+      ]},
+      { id:'L', color:'#A7A9AC', path:[
+        [40.651,-73.890],[40.660,-73.902],[40.672,-73.917],
+        [40.681,-73.934],[40.695,-73.952],[40.715,-74.001],
+        [40.727,-74.010],[40.740,-74.017]
+      ]},
+      { id:'N', color:'#FCCC0A', path:[
+        [40.700,-73.868],[40.710,-73.880],[40.721,-73.893],
+        [40.732,-73.901],[40.741,-73.912],[40.750,-73.990],
+        [40.758,-73.999],[40.764,-74.004],[40.776,-74.011]
+      ]},
+      { id:'G', color:'#6CBE45', path:[
+        [40.677,-73.830],[40.688,-73.842],[40.700,-73.855],
+        [40.712,-73.872],[40.724,-73.888],[40.736,-73.900],
+        [40.745,-73.919],[40.752,-73.931]
+      ]},
+      { id:'7', color:'#B933AD', path:[
+        [40.745,-73.890],[40.745,-73.900],[40.745,-73.915],
+        [40.745,-73.928],[40.746,-73.942],[40.748,-73.960],
+        [40.749,-73.977],[40.754,-73.990]
+      ]},
+      { id:'B', color:'#FF6319', path:[
+        [40.685,-73.978],[40.695,-73.975],[40.704,-73.970],
+        [40.716,-73.962],[40.726,-73.955],[40.735,-73.948],
+        [40.745,-73.940],[40.754,-73.990],[40.762,-73.982],
+        [40.776,-73.958]
+      ]},
+    ],
+  },
+  paris: {
+    name: 'Paris',
+    bounds: { minLat: 48.815, maxLat: 48.905, minLng: 2.255, maxLng: 2.415 },
+    lines: [
+      { id:'1',  name:'M1',  color:'#FFCD00' },
+      { id:'2',  name:'M2',  color:'#003CA6' },
+      { id:'4',  name:'M4',  color:'#CF009E' },
+      { id:'5',  name:'M5',  color:'#FF7E2E' },
+      { id:'6',  name:'M6',  color:'#6ECA97' },
+      { id:'9',  name:'M9',  color:'#B6BD00' },
+      { id:'12', name:'M12', color:'#007852' },
+      { id:'13', name:'M13', color:'#6EC4E8' },
+      { id:'14', name:'M14', color:'#62259D' },
+    ],
+    routes: [
+      { id:'1', color:'#FFCD00', path:[
+        [48.877,2.295],[48.874,2.308],[48.870,2.323],
+        [48.866,2.332],[48.862,2.347],[48.857,2.360],
+        [48.853,2.372],[48.848,2.384]
+      ]},
+      { id:'2', color:'#003CA6', path:[
+        [48.884,2.303],[48.882,2.316],[48.882,2.332],
+        [48.880,2.346],[48.878,2.361],[48.876,2.375],
+        [48.875,2.389]
+      ]},
+      { id:'4', color:'#CF009E', path:[
+        [48.895,2.351],[48.887,2.349],[48.879,2.348],
+        [48.870,2.347],[48.861,2.346],[48.852,2.349],
+        [48.842,2.352]
+      ]},
+      { id:'6', color:'#6ECA97', path:[
+        [48.848,2.302],[48.851,2.315],[48.848,2.329],
+        [48.847,2.343],[48.849,2.358],[48.853,2.372],
+        [48.848,2.384]
+      ]},
+      { id:'14', color:'#62259D', path:[
+        [48.883,2.323],[48.876,2.333],[48.869,2.342],
+        [48.862,2.351],[48.855,2.361],[48.848,2.370]
+      ]},
+      { id:'12', color:'#007852', path:[
+        [48.900,2.323],[48.891,2.327],[48.882,2.331],
+        [48.873,2.335],[48.864,2.339],[48.855,2.337],
+        [48.845,2.333]
+      ]},
+      { id:'13', color:'#6EC4E8', path:[
+        [48.903,2.318],[48.895,2.322],[48.886,2.325],
+        [48.877,2.331],[48.868,2.339],[48.860,2.346],
+        [48.852,2.349]
+      ]},
+      { id:'9', color:'#B6BD00', path:[
+        [48.878,2.275],[48.876,2.289],[48.874,2.305],
+        [48.871,2.320],[48.869,2.336],[48.871,2.352],
+        [48.873,2.368],[48.872,2.382]
+      ]},
+    ],
+  }
+};
+
+// ── CANVAS SETUP ─────────────────────────────────────────────
+
+const mapCanvas   = document.getElementById('mapCanvas');
+const trainCanvas = document.getElementById('trainCanvas');
+const mCtx        = mapCanvas.getContext('2d');
+const tCtx        = trainCanvas.getContext('2d');
+
+function resizeCanvases() {
+  const w = window.innerWidth, h = window.innerHeight;
+  mapCanvas.width  = trainCanvas.width  = w;
+  mapCanvas.height = trainCanvas.height = h;
+}
+
+resizeCanvases();
+window.addEventListener('resize', () => { resizeCanvases(); drawMap(); });
+
+// ── STATE ─────────────────────────────────────────────────────
+
+let city      = 'nyc';
+let trains    = [];
+let mapOff    = { x: 0, y: 0 };
+let zoom      = 1.0;
+let dragging  = false;
+let dragStart = { x: 0, y: 0 };
+
+// ── COORDINATE MAPPING ────────────────────────────────────────
+
+function toXY(lat, lng) {
+  const b = CITIES[city].bounds;
+  const w = mapCanvas.width, h = mapCanvas.height;
+  const nx = (lng - b.minLng) / (b.maxLng - b.minLng);
+  const ny = 1.0 - (lat - b.minLat) / (b.maxLat - b.minLat);
+  return {
+    x: mapOff.x + nx * w * zoom,
+    y: mapOff.y + ny * h * zoom
+  };
+}
+
+// ── TRAIN SIMULATION ─────────────────────────────────────────
+
+function spawnTrains() {
+  trains = [];
+  const cfg = CITIES[city];
+  cfg.routes.forEach(route => {
+    const n = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      trains.push({
+        route,
+        t:          Math.random(),
+        speed:      0.00007 + Math.random() * 0.00011,
+        status:     Math.random() > 0.75 ? 'STOP' : 'MOVE',
+        stopMs:     0,
+        phase:      Math.random() * Math.PI * 2,
+      });
+    }
+  });
+  syncCounts();
+}
+
+function syncCounts() {
+  document.getElementById('trainCountBig').textContent    = trains.length;
+  document.getElementById('trainCountInline').textContent = trains.length;
+}
+
+function trainPos(tr) {
+  const path = tr.route.path;
+  const seg  = tr.t * (path.length - 1);
+  const i    = Math.min(Math.floor(seg), path.length - 2);
+  const f    = seg - i;
+  const a    = path[i], b = path[i + 1];
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+}
+
+function stepTrains(dt) {
+  trains.forEach(tr => {
+    tr.phase += 0.05;
+    if (tr.status === 'STOP') {
+      tr.stopMs += dt;
+      if (tr.stopMs > 1800 + Math.random() * 1200) {
+        tr.status = 'MOVE'; tr.stopMs = 0;
+      }
+    } else {
+      tr.t += tr.speed * (dt / 16);
+      if (tr.t >= 1) {
+        tr.t = Math.random() * 0.05;
+        if (Math.random() > 0.5) { tr.status = 'STOP'; tr.stopMs = 0; }
+      }
+      if (Math.random() < 0.0015) { tr.status = 'STOP'; tr.stopMs = 0; }
+    }
+  });
+}
+
+// ── DRAWING ───────────────────────────────────────────────────
+
+function drawMap() {
+  const w = mapCanvas.width, h = mapCanvas.height;
+  mCtx.clearRect(0, 0, w, h);
+
+  // Background
+  mCtx.fillStyle = '#080c14';
+  mCtx.fillRect(0, 0, w, h);
+
+  // Subtle grid
+  mCtx.strokeStyle = 'rgba(255,255,255,0.022)';
+  mCtx.lineWidth = 1;
+  const gs = 55 * zoom;
+  const ox = ((mapOff.x % gs) + gs) % gs;
+  const oy = ((mapOff.y % gs) + gs) % gs;
+  for (let x = ox; x < w; x += gs) { mCtx.beginPath(); mCtx.moveTo(x,0); mCtx.lineTo(x,h); mCtx.stroke(); }
+  for (let y = oy; y < h; y += gs) { mCtx.beginPath(); mCtx.moveTo(0,y); mCtx.lineTo(w,y); mCtx.stroke(); }
+
+  // Routes
+  CITIES[city].routes.forEach(route => {
+    const pts = route.path.map(([la,ln]) => toXY(la, ln));
+
+    // Glow
+    mCtx.beginPath();
+    mCtx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => mCtx.lineTo(p.x, p.y));
+    mCtx.strokeStyle = route.color + '28';
+    mCtx.lineWidth   = 12 * zoom;
+    mCtx.lineCap = mCtx.lineJoin = 'round';
+    mCtx.stroke();
+
+    // Line
+    mCtx.beginPath();
+    mCtx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => mCtx.lineTo(p.x, p.y));
+    mCtx.strokeStyle = route.color + '70';
+    mCtx.lineWidth   = 3 * zoom;
+    mCtx.stroke();
+
+    // Station dots
+    pts.forEach(p => {
+      mCtx.beginPath();
+      mCtx.arc(p.x, p.y, 3 * zoom, 0, Math.PI * 2);
+      mCtx.fillStyle = route.color + 'aa';
+      mCtx.fill();
+    });
+  });
+}
+
+function drawTrains() {
+  const w = trainCanvas.width, h = trainCanvas.height;
+  tCtx.clearRect(0, 0, w, h);
+
+  trains.forEach(tr => {
+    const [la, ln] = trainPos(tr);
+    const { x, y } = toXY(la, ln);
+    if (x < -30 || x > w + 30 || y < -30 || y > h + 30) return;
+
+    const r     = Math.max(7, 10 * zoom);
+    const pulse = (Math.sin(tr.phase) + 1) / 2;
+    const col   = tr.route.color;
+
+    // Pulse ring when stopped
+    if (tr.status === 'STOP') {
+      tCtx.beginPath();
+      tCtx.arc(x, y, r * (1.9 + pulse * 0.9), 0, Math.PI * 2);
+      const alpha = Math.round(pulse * 100).toString(16).padStart(2, '0');
+      tCtx.strokeStyle = col + alpha;
+      tCtx.lineWidth = 1.5;
+      tCtx.stroke();
+    }
+
+    // Glow halo
+    const grd = tCtx.createRadialGradient(x, y, 0, x, y, r * 2.8);
+    grd.addColorStop(0, col + 'cc');
+    grd.addColorStop(1, col + '00');
+    tCtx.beginPath();
+    tCtx.arc(x, y, r * 2.8, 0, Math.PI * 2);
+    tCtx.fillStyle = grd;
+    tCtx.fill();
+
+    // Circle
+    tCtx.beginPath();
+    tCtx.arc(x, y, r, 0, Math.PI * 2);
+    tCtx.fillStyle = col;
+    tCtx.fill();
+
+    // White border ring
+    tCtx.beginPath();
+    tCtx.arc(x, y, r, 0, Math.PI * 2);
+    tCtx.strokeStyle = 'rgba(255,255,255,0.25)';
+    tCtx.lineWidth = 1;
+    tCtx.stroke();
+
+    // Label — black on yellow, white on dark
+    const bright = ['#FFCD00','#FCCC0A','#B6BD00','#6CBE45','#6ECA97','#A7A9AC'];
+    tCtx.fillStyle = bright.includes(col) ? '#111' : '#fff';
+    tCtx.font = `bold ${Math.max(7, Math.round(8.5 * zoom))}px DM Mono, monospace`;
+    tCtx.textAlign    = 'center';
+    tCtx.textBaseline = 'middle';
+    tCtx.fillText(tr.route.id, x, y + 0.5);
+  });
+}
+
+// ── RENDER LOOP ───────────────────────────────────────────────
+
+let last = 0;
+function loop(ts) {
+  const dt = Math.min(ts - last, 100);
+  last = ts;
+  stepTrains(dt);
+  drawMap();
+  drawTrains();
+  requestAnimationFrame(loop);
+}
+
+// ── CITY SWITCH ───────────────────────────────────────────────
+
+function switchCity(id, btn) {
+  if (id === city) return;
+  const cover = document.getElementById('fadeCover');
+  cover.classList.add('active');
+  setTimeout(() => {
+    city    = id;
+    mapOff  = { x: 0, y: 0 };
+    zoom    = 1.0;
+    document.getElementById('cityName').textContent = CITIES[id].name;
+    spawnTrains();
+    renderLegend();
+    document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    setTimeout(() => cover.classList.remove('active'), 380);
+  }, 350);
+}
+
+// ── LEGEND ────────────────────────────────────────────────────
+
+function renderLegend() {
+  const row = document.getElementById('linesRow');
+  row.innerHTML = CITIES[city].lines.map(l =>
+    `<div class="line-chip">
+      <div class="line-dot" style="background:${l.color};box-shadow:0 0 5px ${l.color}88"></div>
+      ${l.name}
+    </div>`
+  ).join('');
+}
+
+// ── CLOCK ─────────────────────────────────────────────────────
+
+function tick() {
+  const n  = new Date();
+  const hh = String(n.getHours()).padStart(2,'0');
+  const mm = String(n.getMinutes()).padStart(2,'0');
+  document.getElementById('clockTime').textContent = `${hh}:${mm}`;
+  document.getElementById('clockDate').textContent = n.toLocaleDateString('en-US',
+    { weekday:'short', month:'short', day:'numeric' }).toUpperCase();
+}
+
+// ── PAN & ZOOM ────────────────────────────────────────────────
+
+trainCanvas.addEventListener('mousedown', e => {
+  dragging  = true;
+  dragStart = { x: e.clientX - mapOff.x, y: e.clientY - mapOff.y };
+  trainCanvas.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  mapOff.x = e.clientX - dragStart.x;
+  mapOff.y = e.clientY - dragStart.y;
+});
+window.addEventListener('mouseup', () => {
+  dragging = false;
+  trainCanvas.style.cursor = 'default';
+});
+trainCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const f  = e.deltaY < 0 ? 1.1 : 0.91;
+  const nz = Math.max(0.4, Math.min(5, zoom * f));
+  const mx = e.clientX, my = e.clientY;
+  mapOff.x = mx - (mx - mapOff.x) * (nz / zoom);
+  mapOff.y = my - (my - mapOff.y) * (nz / zoom);
+  zoom = nz;
+}, { passive: false });
+
+// ── AD — SPLIT SCREEN, 5-MINUTE INTERVAL ─────────────────────
+
+const AD_INTERVAL = 5 * 60 * 1000;   // 5 minutes
+const AD_DURATION = 30 * 1000;        // 30 seconds then auto-dismiss
+
+let adTimeout;
+let adAutoDismiss;
+
+function scheduleAd() {
+  clearTimeout(adTimeout);
+  clearTimeout(adAutoDismiss);
+  adTimeout = setTimeout(showAd, AD_INTERVAL);
+}
+
+function showAd() {
+  const map     = document.getElementById('map');
+  const panel   = document.getElementById('adPanel');
+  const divider = document.getElementById('adDivider');
+  const fill    = document.getElementById('adTimerFill');
+
+  // Shrink map to left half
+  map.classList.add('ad-active');
+  document.body.classList.add('ad-active-ui');
+
+  // Slide in ad panel + divider
+  requestAnimationFrame(() => {
+    panel.classList.add('visible');
+    divider.classList.add('visible');
+  });
+
+  // Animate countdown bar
+  fill.style.transition = 'none';
+  fill.style.transform  = 'scaleX(1)';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      fill.style.transition = `transform ${AD_DURATION / 1000}s linear`;
+      fill.style.transform  = 'scaleX(0)';
+    });
+  });
+
+  // Auto-dismiss after AD_DURATION
+  adAutoDismiss = setTimeout(closeAd, AD_DURATION);
+}
+
+function closeAd() {
+  clearTimeout(adAutoDismiss);
+
+  const map     = document.getElementById('map');
+  const panel   = document.getElementById('adPanel');
+  const divider = document.getElementById('adDivider');
+
+  // Slide out panel + restore map
+  panel.classList.remove('visible');
+  divider.classList.remove('visible');
+
+  setTimeout(() => {
+    map.classList.remove('ad-active');
+    document.body.classList.remove('ad-active-ui');
+  }, 600); // wait for slide-out animation
+
+  scheduleAd();
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+
+renderLegend();
+spawnTrains();
+tick();
+setInterval(tick, 10000);
+scheduleAd();
+
+setTimeout(() => {
+  document.getElementById('statusLabel').textContent = 'Live · 20s refresh';
+}, 1200);
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
