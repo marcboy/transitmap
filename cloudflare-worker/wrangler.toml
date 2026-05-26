@@ -1,0 +1,16 @@
+name = "transitmap-worker"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Environment variables (set secrets via: wrangler secret put MTA_API_KEY)
+# [vars]
+# No public vars — all keys are secrets
+
+# Routes — update with your actual domain
+# [[routes]]
+# pattern = "api.yourdomain.com/*"
+# zone_name = "yourdomain.com"
+
+[dev]
+port = 8787
+local_protocol = "http"
