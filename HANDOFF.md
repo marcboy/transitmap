@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Paris: all 16 Métro lines with full accurate station coordinates
+> **Last change:** Fix: map tiles restored — Leaflet init moved inside window.load so container is sized first
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
@@ -208,6 +208,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | Fix: city map tiles disappeared — Leaflet invalidateSize + window.load init |
 | 2026-05-26 | Paris: all 16 lines added (M1-M14 incl. 3b, 7b) with full station coords |
 | 2026-05-26 | Map brightness fixed: dark_matter_lite tiles + tint reduced 0.55→0.18 |
 | 2026-05-26 | Prototype hosted on GitHub Pages: https://marcboy.github.io/transitmap/ |
