@@ -387,6 +387,7 @@
 <div class="city-switcher">
   <button class="city-btn active" onclick="switchCity('nyc',this)">&#127482;&#127480; New York</button>
   <button class="city-btn"        onclick="switchCity('paris',this)">&#127467;&#127479; Paris</button>
+  <button class="city-btn"        onclick="switchCity('seattle',this)">&#127482;&#127480; Seattle</button>
 </div>
 
 <div class="topbar">
@@ -565,6 +566,58 @@ const CITIES = {
     ],
   }
 };
+
+  // ── Seattle (Sound Transit Link Light Rail) ────────────────
+  CITIES.seattle = {
+    name:   'Seattle',
+    center: [47.603, -122.329],
+    zoom:   12,
+    lines: [
+      { id:'1-Line', name:'1 Line', color:'#0091DA' }, // Blue
+      { id:'2-Line', name:'2 Line', color:'#0091DA' }, // Blue (shares color with 1 Line)
+      { id:'T-Line', name:'T Line', color:'#E31837' }, // Red (Tacoma Link)
+    ],
+    routes: [
+      // 1 Line — Lynnwood to Federal Way (simplified key stations)
+      { id:'1-Line', color:'#0091DA', path:[
+        [47.776,-122.294], // Lynnwood City Center
+        [47.762,-122.288], // Shoreline North/185th
+        [47.745,-122.294], // Shoreline South/148th
+        [47.726,-122.306], // Mountlake Terrace
+        [47.710,-122.312], // Northgate
+        [47.700,-122.313], // Roosevelt
+        [47.691,-122.317], // U District
+        [47.680,-122.313], // UW Station
+        [47.665,-122.313], // Capitol Hill
+        [47.651,-122.305], // Westlake (Downtown)
+        [47.648,-122.302], // University St
+        [47.645,-122.296], // Pioneer Square
+        [47.640,-122.296], // International District
+        [47.634,-122.297], // SODO
+        [47.618,-122.300], // Beacon Hill
+        [47.576,-122.304], // Columbia City
+        [47.559,-122.302], // Othello
+        [47.543,-122.285], // Rainier Beach
+        [47.507,-122.270], // Tukwila Int'l Blvd
+        [47.463,-122.301], // SeaTac Airport
+        [47.440,-122.289], // Angle Lake
+        [47.373,-122.300], // Federal Way
+      ]},
+      // 2 Line — Redmond to South Bellevue (simplified)
+      { id:'2-Line', color:'#53B0E3', path:[
+        [47.651,-122.305], // Westlake (shared)
+        [47.622,-122.198], // South Bellevue
+        [47.610,-122.201], // East Main
+        [47.617,-122.188], // Bellevue Downtown
+        [47.629,-122.170], // Wilburton
+        [47.640,-122.149], // Spring District
+        [47.652,-122.136], // BelRed/130th
+        [47.660,-122.117], // Overlake Village
+        [47.668,-122.104], // Redmond Tech
+        [47.679,-122.122], // Downtown Redmond
+      ]},
+    ],
+  };
 
 // ── LEAFLET MAP SETUP ─────────────────────────────────────────
 
