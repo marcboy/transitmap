@@ -6,7 +6,7 @@ import Foundation
 
 enum CityConfig {
 
-    static let all: [City] = [nyc, paris]
+    static let all: [City] = [nyc, paris, seattle]
 
     // MARK: - New York City
 
@@ -89,6 +89,31 @@ enum CityConfig {
             LineInfo(id: "12", name: "M12", color: "#007852"),
             LineInfo(id: "13", name: "M13", color: "#6EC4E8"),
             LineInfo(id: "14", name: "M14", color: "#62259D"),
+        ]
+    )
+
+    // MARK: - Seattle
+
+    static let seattle = City(
+        id: "seattle",
+        name: "Seattle",
+        country: "US",
+        center: Coordinate(lat: 47.603, lng: -122.329),
+        defaultZoom: 12,
+        feeds: [
+            // Sound Transit OneBusAway GTFS-RT
+            // Request free API key: email oba_api_key@soundtransit.org
+            FeedConfig(
+                id: "sound-transit",
+                url: "https://api.pugetsound.onebusaway.org/api/gtfs_realtime/vehicle-positions-for-agency/40.pb",
+                apiKey: "YOUR_OBA_API_KEY",
+                apiKeyHeader: "key"   // passed as query param ?key=
+            ),
+        ],
+        lines: [
+            LineInfo(id: "1-Line", name: "1 Line", color: "#0091DA"), // Blue — Lynnwood to Federal Way
+            LineInfo(id: "2-Line", name: "2 Line", color: "#53B0E3"), // Light Blue — Redmond to Downtown
+            LineInfo(id: "T-Line", name: "T Line", color: "#E31837"), // Red — Tacoma Link
         ]
     )
 
