@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Real map tiles added (CartoDB dark via Leaflet.js)  
+> **Last change:** Seattle added (Sound Transit Link Light Rail — 1 Line, 2 Line, T Line)  
 > **Repo:** https://github.com/marcboy/transitmap
 
 ---
@@ -141,6 +141,11 @@ protoc --swift_out=. gtfs-realtime.proto
 3. Add to `static let all: [City] = [nyc, paris, YOUR_CITY]`
 4. Rebuild — all platforms get the new city automatically
 
+Cities configured and ready:
+- ✅ New York City (MTA GTFS-RT)
+- ✅ Paris (IDFM / RATP GTFS-RT)
+- ✅ Seattle (Sound Transit OneBusAway GTFS-RT)
+
 Cities with working GTFS-RT feeds ready to add:
 - London (TfL) — `https://api.tfl.gov.uk`
 - Chicago (CTA) — `https://www.transitchicago.com/downloads/sch_data/`
@@ -168,7 +173,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Control | Action |
 |---|---|
-| City buttons (top center) | Switch between NYC and Paris |
+| City buttons (top center) | Switch between NYC, Paris, and Seattle |
 | Click + drag | Pan the map |
 | Scroll wheel | Zoom in/out |
 | Every 5 minutes | Ad slides in from right (map shrinks to left half) |
@@ -202,6 +207,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | Seattle added — Sound Transit Link Light Rail (1 Line, 2 Line, T Line) |
 | 2026-05-26 | Removed Cloudflare dependency — direct feed fetching on-device |
 | 2026-05-26 | Added `Config/CityConfig.swift` — all city config on-device |
 | 2026-05-26 | Ad format changed: fullscreen overlay → split-screen (half map, half ad) |
