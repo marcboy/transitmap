@@ -1,8 +1,8 @@
 // Services/TransitViewModel.swift
-// Central state: live trains, city selection, ad scheduling
+// Central state: live trains, city selection, ad scheduling.
+// No server bootstrap needed — cities load instantly from CityConfig.
 
 import SwiftUI
-import Combine
 
 @MainActor
 final class TransitViewModel: ObservableObject {
@@ -18,7 +18,7 @@ final class TransitViewModel: ObservableObject {
 
     // Ad state — observed by AdManager
     @Published var showAd = false
-    @Published var adConfig = AdConfig(intervalSeconds: 300, durationSeconds: 30, enabled: true)
+    let adConfig = AdConfig()   // hardcoded defaults; edit AdConfig in TransitModels.swift
 
     // MARK: - Private
 
@@ -29,40 +29,17 @@ final class TransitViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func onAppear() {
-        Task { await bootstrap() }
+        // Cities are local — instant, no network call
+        cities = api.cities()
+        selectedCity = cities.first(where: { $0.id == "nyc" }) ?? cities.first
+
+        startRefreshLoop()
+        scheduleAdTimer()
     }
 
     func onDisappear() {
         refreshTask?.cancel()
         adTimer?.invalidate()
-    }
-
-    // MARK: - Bootstrap
-
-    private func bootstrap() async {
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            // Load config (ad settings) and city list in parallel
-            async let configTask  = api.fetchConfig()
-            async let citiesTask  = api.fetchCities()
-
-            let (config, fetchedCities) = try await (configTask, citiesTask)
-
-            adConfig = config.ads
-            cities   = fetchedCities
-
-            // Default to NYC
-            selectedCity = fetchedCities.first(where: { $0.id == "nyc" }) ?? fetchedCities.first
-
-            // Start data loop & ad timer
-            startRefreshLoop()
-            scheduleAdTimer()
-
-        } catch {
-            errorMessage = error.localizedDescription
-        }
     }
 
     // MARK: - City switching
@@ -89,14 +66,17 @@ final class TransitViewModel: ObservableObject {
 
     private func refreshTrains() async {
         guard let city = selectedCity else { return }
+        isLoading = trains.isEmpty   // only show spinner on first load
+
         do {
-            let response = try await api.fetchTrains(cityId: city.id)
-            trains       = response.trains
+            trains       = try await api.fetchTrains(for: city)
             lastUpdated  = Date()
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
+
+        isLoading = false
     }
 
     // MARK: - Ad scheduling
