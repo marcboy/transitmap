@@ -5,18 +5,26 @@ import Foundation
 import CoreLocation
 import SwiftUI
 
-// MARK: - City
+// MARK: - City (now defined on-device — no server needed)
 
-struct City: Identifiable, Codable, Hashable {
+struct City: Identifiable, Hashable {
     let id: String
     let name: String
     let country: String
     let center: Coordinate
-    let zoom: Double
+    let defaultZoom: Double
+    let feeds: [FeedConfig]
     let lines: [LineInfo]
 }
 
-struct Coordinate: Codable, Hashable {
+struct FeedConfig: Hashable {
+    let id: String
+    let url: String
+    let apiKey: String        // stored in app — free keys, no billing risk
+    let apiKeyHeader: String  // e.g. "x-api-key" for MTA, "apikey" for IDFM
+}
+
+struct Coordinate: Hashable {
     let lat: Double
     let lng: Double
 
@@ -25,32 +33,32 @@ struct Coordinate: Codable, Hashable {
     }
 }
 
-struct LineInfo: Identifiable, Codable, Hashable {
+struct LineInfo: Identifiable, Hashable {
     let id: String
     let name: String
-    let color: String   // hex string e.g. "#EE352E"
+    let color: String   // hex e.g. "#EE352E"
 
     var swiftUIColor: Color {
         Color(hex: color) ?? .gray
     }
 }
 
-// MARK: - Train
+// MARK: - Train (built from decoded protobuf)
 
-struct Train: Identifiable, Codable, Hashable {
+struct Train: Identifiable, Hashable {
     let id: String
     let lineId: String
     let lineName: String
     let lineColor: String
     let lat: Double
     let lng: Double
-    let bearing: Double?
-    let speed: Double?
+    let bearing: Float?
+    let speed: Float?
     let status: VehicleStatus
     let stopId: String?
     let tripId: String?
-    let timestamp: TimeInterval
-    let staleSeconds: Int
+    let timestamp: UInt64
+    let fetchedAt: Date
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: lat, longitude: lng)
@@ -60,32 +68,25 @@ struct Train: Identifiable, Codable, Hashable {
         Color(hex: lineColor) ?? .gray
     }
 
+    var staleSeconds: Int {
+        Int(Date().timeIntervalSince(fetchedAt))
+    }
+
     var isStale: Bool { staleSeconds > 90 }
 }
 
-enum VehicleStatus: String, Codable {
+enum VehicleStatus: String {
     case incoming  = "INCOMING"
     case atStop    = "AT_STOP"
     case inTransit = "IN_TRANSIT"
 }
 
-// MARK: - API Response wrappers
+// MARK: - Ad config (hardcoded, changeable via App Store update)
 
-struct TrainResponse: Codable {
-    let city: String
-    let updatedAt: String
-    let trains: [Train]
-}
-
-struct ConfigResponse: Codable {
-    let ads: AdConfig
-    let version: String
-}
-
-struct AdConfig: Codable {
-    let intervalSeconds: Int
-    let durationSeconds: Int
-    let enabled: Bool
+struct AdConfig {
+    var intervalSeconds: Int  = 300   // 5 minutes
+    var durationSeconds: Int  = 30
+    var enabled: Bool         = true
 }
 
 // MARK: - Color extension
