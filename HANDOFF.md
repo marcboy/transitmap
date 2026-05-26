@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Tokyo added (all 13 lines); version stamp; train density increased
+> **Last change:** Root fix: Leaflet constructed inside window.load — map tiles now always render
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
@@ -208,6 +208,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | Root fix: L.map() moved inside window.load — tiles were never loading before |
 | 2026-05-26 | Tokyo: all 13 subway lines (Tokyo Metro + Toei) |
 | 2026-05-26 | Version stamp + edit time shown next to clock |
 | 2026-05-26 | Train density: 5-8 per route (was 3-7) |
