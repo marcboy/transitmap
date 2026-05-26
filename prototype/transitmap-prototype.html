@@ -1036,20 +1036,23 @@ function closeAd() {
 
 // ── INIT ──────────────────────────────────────────────────────
 
-const cfg0 = CITIES[cityId];
-leafletMap.setView(cfg0.center, cfg0.zoom);
-drawRoutes();
-spawnTrains();
-renderLegend();
-tick();
-setInterval(tick, 10000);
-scheduleAd();
+window.addEventListener('load', () => {
+  const cfg0 = CITIES[cityId];
+  leafletMap.invalidateSize();
+  leafletMap.setView(cfg0.center, cfg0.zoom);
+  drawRoutes();
+  spawnTrains();
+  renderLegend();
+  tick();
+  setInterval(tick, 10000);
+  scheduleAd();
 
-setTimeout(() => {
-  document.getElementById('statusLabel').textContent = 'Live · 20s refresh';
-}, 1500);
+  setTimeout(() => {
+    document.getElementById('statusLabel').textContent = 'Live · 20s refresh';
+  }, 1500);
 
-requestAnimationFrame(loop);
+  requestAnimationFrame(loop);
+});
 </script>
 </body>
 </html>
