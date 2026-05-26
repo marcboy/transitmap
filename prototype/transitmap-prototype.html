@@ -570,51 +570,62 @@ const CITIES = {
   // ── Seattle (Sound Transit Link Light Rail) ────────────────
   CITIES.seattle = {
     name:   'Seattle',
-    center: [47.603, -122.329],
-    zoom:   12,
+    // Center between downtown and Bellevue so both lines are visible
+    center: [47.620, -122.250],
+    zoom:   11,
     lines: [
-      { id:'1-Line', name:'1 Line', color:'#0091DA' }, // Blue
-      { id:'2-Line', name:'2 Line', color:'#0091DA' }, // Blue (shares color with 1 Line)
-      { id:'T-Line', name:'T Line', color:'#E31837' }, // Red (Tacoma Link)
+      { id:'1-Line', name:'1 Line', color:'#0091DA' },
+      { id:'2-Line', name:'2 Line', color:'#53B0E3' },
     ],
     routes: [
-      // 1 Line — Lynnwood to Federal Way (simplified key stations)
+      // 1 Line — Lynnwood City Center → Federal Way Downtown
+      // Runs north-south through Seattle, does NOT go to Bellevue
       { id:'1-Line', color:'#0091DA', path:[
-        [47.776,-122.294], // Lynnwood City Center
-        [47.762,-122.288], // Shoreline North/185th
-        [47.745,-122.294], // Shoreline South/148th
-        [47.726,-122.306], // Mountlake Terrace
-        [47.710,-122.312], // Northgate
-        [47.700,-122.313], // Roosevelt
-        [47.691,-122.317], // U District
-        [47.680,-122.313], // UW Station
-        [47.665,-122.313], // Capitol Hill
-        [47.651,-122.305], // Westlake (Downtown)
-        [47.648,-122.302], // University St
-        [47.645,-122.296], // Pioneer Square
-        [47.640,-122.296], // International District
-        [47.634,-122.297], // SODO
-        [47.618,-122.300], // Beacon Hill
-        [47.576,-122.304], // Columbia City
-        [47.559,-122.302], // Othello
-        [47.543,-122.285], // Rainier Beach
-        [47.507,-122.270], // Tukwila Int'l Blvd
-        [47.463,-122.301], // SeaTac Airport
-        [47.440,-122.289], // Angle Lake
-        [47.373,-122.300], // Federal Way
+        [47.8136,-122.2945], // Lynnwood City Center
+        [47.7946,-122.2887], // Shoreline North/185th
+        [47.7752,-122.2944], // Shoreline South/148th
+        [47.7561,-122.3063], // Mountlake Terrace
+        [47.7060,-122.3129], // Northgate
+        [47.6986,-122.3139], // Roosevelt
+        [47.6903,-122.3170], // U District
+        [47.6496,-122.3032], // Westlake ← shared junction
+        [47.6480,-122.3015], // University Street
+        [47.6452,-122.2969], // Pioneer Square
+        [47.5977,-122.3001], // International District/Chinatown
+        [47.5783,-122.3036], // SODO
+        [47.5766,-122.3001], // Beacon Hill
+        [47.5756,-122.3040], // Mount Baker
+        [47.5581,-122.2893], // Columbia City
+        [47.5333,-122.2779], // Othello
+        [47.5213,-122.2657], // Rainier Beach
+        [47.4638,-122.2878], // Tukwila Int'l Blvd
+        [47.4448,-122.2992], // SeaTac/Airport
+        [47.4317,-122.2974], // Angle Lake
+        [47.3146,-122.3129], // Federal Way Downtown
       ]},
-      // 2 Line — Redmond to South Bellevue (simplified)
+
+      // 2 Line — Downtown Redmond → Westlake (via I-90 floating bridge)
+      // Shares the downtown Seattle tunnel stations with the 1 Line,
+      // then crosses Lake Washington east to Bellevue and Redmond
       { id:'2-Line', color:'#53B0E3', path:[
-        [47.651,-122.305], // Westlake (shared)
-        [47.622,-122.198], // South Bellevue
-        [47.610,-122.201], // East Main
-        [47.617,-122.188], // Bellevue Downtown
-        [47.629,-122.170], // Wilburton
-        [47.640,-122.149], // Spring District
-        [47.652,-122.136], // BelRed/130th
-        [47.660,-122.117], // Overlake Village
-        [47.668,-122.104], // Redmond Tech
-        [47.679,-122.122], // Downtown Redmond
+        [47.6784,-122.1218], // Downtown Redmond
+        [47.6691,-122.1040], // Redmond Technology
+        [47.6601,-122.1175], // Overlake Village
+        [47.6404,-122.1496], // Spring District/120th
+        [47.6194,-122.1498], // BelRed/130th (was Bel-Red)
+        [47.6173,-122.1888], // Wilburton
+        [47.6153,-122.2006], // Bellevue Downtown
+        [47.6007,-122.2015], // East Main
+        [47.5851,-122.1962], // South Bellevue
+        // I-90 floating bridge crossing Lake Washington
+        [47.5790,-122.2200],
+        [47.5771,-122.2500],
+        [47.5752,-122.2750],
+        // Merges into downtown Seattle tunnel
+        [47.5977,-122.3001], // International District/Chinatown ← shared with 1 Line
+        [47.6452,-122.2969], // Pioneer Square ← shared
+        [47.6480,-122.3015], // University Street ← shared
+        [47.6496,-122.3032], // Westlake ← shared junction
       ]},
     ],
   };
