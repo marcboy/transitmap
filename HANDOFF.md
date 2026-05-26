@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Prototype hosted on GitHub Pages
+> **Last change:** Map brightness fixed — lighter tile style, reduced dark tint
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
@@ -208,6 +208,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | Map brightness fixed: dark_matter_lite tiles + tint reduced 0.55→0.18 |
 | 2026-05-26 | Prototype hosted on GitHub Pages: https://marcboy.github.io/transitmap/ |
 | 2026-05-26 | Seattle: fixed 2 Line path via I-90 bridge + shared downtown tunnel stations with 1 Line | |
 | 2026-05-26 | Removed Cloudflare dependency — direct feed fetching on-device |
