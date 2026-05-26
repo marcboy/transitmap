@@ -91,6 +91,27 @@ export const CITY_CONFIGS = {
     ],
   },
 
+  // ── Seattle ────────────────────────────────────────────────
+  seattle: {
+    name: 'Seattle',
+    country: 'US',
+    center: { lat: 47.603, lng: -122.329 },
+    defaultZoom: 12,
+    feeds: [
+      {
+        id: 'sound-transit',
+        url: 'https://api.pugetsound.onebusaway.org/api/gtfs_realtime/vehicle-positions-for-agency/40.pb',
+        apiKeyParam: 'key',
+        apiKeyEnvVar: 'OBA_API_KEY',
+      },
+    ],
+    lines: [
+      { id: '1-Line', name: '1 Line', color: '#0091DA' },
+      { id: '2-Line', name: '2 Line', color: '#53B0E3' },
+      { id: 'T-Line', name: 'T Line', color: '#E31837' },
+    ],
+  },
+
   // ── Template for future cities ─────────────────────────────
   // london: {
   //   name: 'London',
