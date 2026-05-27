@@ -748,17 +748,26 @@ async function fetchRealTrains() {
       const route = city.routes.find(r => r.id === t.line)
                  ?? { id: t.line, color: t.color, path: [] };
       const prev = prevPos[t.id];
+
+      // Distance guard: MTA entity IDs are sequential feed numbers that change every
+      // snapshot — the same ID may refer to a completely different physical train on
+      // the next poll. If the "previous" position is more than ~0.05° away (≈5 km)
+      // from the newly reported position, assume ID reuse and jump immediately
+      // instead of lerping a train across half the city.
+      const tooFar = prev &&
+        (Math.abs(prev.lat - t.lat) + Math.abs(prev.lng - t.lng)) > 0.05;
+      const usePrev = prev && !tooFar;
+
       return {
         id:      t.id,
         route,
         realLat: t.lat,
         realLng: t.lng,
-        // Lerp from previous known position to new one
-        prevLat: prev ? prev.lat : t.lat,
-        prevLng: prev ? prev.lng : t.lng,
-        animLat: prev ? prev.lat : t.lat,
-        animLng: prev ? prev.lng : t.lng,
-        lerpT:   prev ? 0 : 1,  // start lerp from 0 if we have a previous position
+        prevLat: usePrev ? prev.lat : t.lat,
+        prevLng: usePrev ? prev.lng : t.lng,
+        animLat: usePrev ? prev.lat : t.lat,
+        animLng: usePrev ? prev.lng : t.lng,
+        lerpT:   usePrev ? 0 : 1,
         status:  t.status === 'AT_STOP' ? 'STOP' : 'MOVE',
         stopMs:  0,
         phase:   Math.random() * Math.PI * 2,

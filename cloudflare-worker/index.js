@@ -186,6 +186,7 @@ export default {
       return json({ status: 'ok', ts: new Date().toISOString() });
     }
 
+
     if (path === '/trains/nyc') {
       try {
         const trains = await fetchAllMTATrains();
@@ -349,10 +350,13 @@ async function fetchAllMTATrains() {
         if (!routeId || !LINE_COLORS[routeId]) continue;
         const stale = now - (v.timestamp ?? now);
         if (stale > 180) continue;
-        if (seen.has(entity.id)) continue;
-        seen.add(entity.id);
+        // Use tripId as stable key — entity.id is a sequential feed number that
+        // changes every snapshot, causing the lerp to animate between unrelated trains.
+        const stableId = v.trip?.tripId || entity.id;
+        if (seen.has(stableId)) continue;
+        seen.add(stableId);
         trains.push({
-          id:     entity.id,
+          id:     stableId,
           line:   routeId,
           color:  LINE_COLORS[routeId],
           lat:    Math.round(v.position.latitude  * 100000) / 100000,
@@ -369,7 +373,10 @@ async function fetchAllMTATrains() {
         const tu = entity.tripUpdate;
         const routeId = tu.trip?.routeId ?? '';
         if (!routeId || !LINE_COLORS[routeId]) continue;
-        if (seen.has(entity.id)) continue;
+        // Same stable-ID fix: use tripId so prevPos lookup in the client matches
+        // the same physical train across feed snapshots, not a random other train.
+        const stableId = tu.trip?.tripId || entity.id;
+        if (seen.has(stableId)) continue;
 
         let position = null;
         for (const su of (tu.stopTimeUpdate ?? [])) {
@@ -379,9 +386,9 @@ async function fetchAllMTATrains() {
         }
         if (!position) continue;
 
-        seen.add(entity.id);
+        seen.add(stableId);
         trains.push({
-          id:    entity.id,
+          id:    stableId,
           line:  routeId,
           color: LINE_COLORS[routeId],
           lat:   position.lat,
@@ -514,3 +521,4 @@ class PB {
 function json(data,status=200){
   return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json',...CORS}});
 }
+
