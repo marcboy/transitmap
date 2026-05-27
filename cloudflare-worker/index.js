@@ -197,13 +197,34 @@ export default {
 
     if (path === '/trains/paris') {
       const key = env.IDFM_API_KEY;
-      if (!key) return json({ error: 'IDFM_API_KEY secret not set — get free key at prim.iledefrance-mobilites.fr' }, 500);
+      if (!key) return json({ error: 'IDFM_API_KEY secret not set' }, 500);
       try {
         const trains = await fetchParisTrains(key);
         return json({ city:'paris', count:trains.length, updatedAt:new Date().toISOString(), trains });
       } catch (e) {
         return json({ error: e.message }, 500);
       }
+    }
+
+    // Debug: probe multiple IDFM URL patterns to find the correct one
+    if (path === '/paris/probe') {
+      const key = env.IDFM_API_KEY;
+      if (!key) return json({ error: 'IDFM_API_KEY not set' }, 500);
+      const urls = [
+        'https://prim.iledefrance-mobilites.fr/marketplace/gtfs-rt/vehiclePositions',
+        'https://prim.iledefrance-mobilites.fr/marketplace/v2/gtfs-rt/vehiclePositions',
+        'https://prim.iledefrance-mobilites.fr/marketplace/gtfs-rt/vehicle-positions',
+        'https://prim.iledefrance-mobilites.fr/marketplace/v2/gtfs-rt/vehicle-positions',
+        'https://prim.iledefrance-mobilites.fr/marketplace/gtfs-realtime/vehiclePositions',
+      ];
+      const results = await Promise.all(urls.map(async url => {
+        try {
+          const r = await fetch(url, { headers: { apikey: key }, signal: AbortSignal.timeout(5000) });
+          const buf = await r.arrayBuffer();
+          return { url, status: r.status, bytes: buf.byteLength };
+        } catch(e) { return { url, error: e.message }; }
+      }));
+      return json(results);
     }
 
     if (path === '/trains/seattle') {
