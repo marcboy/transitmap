@@ -143,6 +143,17 @@ const STOPS = {
   'R44':[40.6213,-73.9285],'R45':[40.6082,-73.9225],
 };
 
+// Sound Transit Link Light Rail via OneBusAway
+// Agency 40 = Sound Transit (1 Line, 2 Line, T Line)
+// API key stored as secret: wrangler secret put OBA_API_KEY
+const OBA_FEED = 'https://api.pugetsound.onebusaway.org/api/gtfs_realtime/vehicle-positions-for-agency/40.pb';
+
+const SEATTLE_LINE_COLORS = {
+  '1-Line': '#E31837',  // Red
+  '2-Line': '#0091DA',  // Blue
+  'T-Line': '#028A0F',  // Green (Tacoma Link)
+};
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -161,10 +172,61 @@ export default {
       }
     }
 
+    if (path === '/trains/seattle') {
+      const key = env.OBA_API_KEY;
+      if (!key) return json({ error: 'OBA_API_KEY secret not set — run: wrangler secret put OBA_API_KEY' }, 500);
+      try {
+        const trains = await fetchSeattleTrains(key);
+        return json({ city:'seattle', count:trains.length, updatedAt:new Date().toISOString(), trains });
+      } catch (e) {
+        return json({ error: e.message }, 500);
+      }
+    }
 
-    return json({ error:'Not found. Try /trains/nyc or /health' }, 404);
+    return json({ error:'Not found. Try /trains/nyc, /trains/seattle, or /health' }, 404);
   }
 };
+
+// ── Seattle — Sound Transit via OneBusAway ────────────────────
+// OBA publishes a true vehicle positions feed with real GPS coords
+
+async function fetchSeattleTrains(apiKey) {
+  const url  = `${OBA_FEED}?key=${apiKey}`;
+  const resp = await withTimeout(fetch(url, { cf:{ cacheTtl:15, cacheEverything:true } }), 8000);
+  if (!resp.ok) throw new Error(`OBA feed ${resp.status}`);
+
+  const bytes   = new Uint8Array(await resp.arrayBuffer());
+  const entities = decodeFeed(bytes);
+  const trains   = [];
+  const now      = Math.floor(Date.now() / 1000);
+
+  for (const entity of entities) {
+    // OBA vehicle positions feed has real GPS in entity.vehicle.position
+    const v = entity.vehicle;
+    if (!v?.position) continue;
+
+    const routeId = v.trip?.routeId ?? '';
+    const color   = SEATTLE_LINE_COLORS[routeId];
+    if (!color) continue;  // skip non-Link routes
+
+    const stale = now - (v.timestamp ?? now);
+    if (stale > 180) continue;
+
+    trains.push({
+      id:      entity.id,
+      line:    routeId,
+      color,
+      lat:     Math.round(v.position.latitude  * 100000) / 100000,
+      lng:     Math.round(v.position.longitude * 100000) / 100000,
+      bearing: v.position.bearing ? Math.round(v.position.bearing) : null,
+      status:  ['INCOMING','AT_STOP','IN_TRANSIT'][v.currentStatus] ?? 'IN_TRANSIT',
+      source:  'gps',
+      stale,
+    });
+  }
+
+  return trains;
+}
 
 // ── Fetch all MTA feeds concurrently ─────────────────────────
 
