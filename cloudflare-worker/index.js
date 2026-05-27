@@ -161,21 +161,15 @@ export default {
       }
     }
 
+    // Fast debug — decode ONE feed only, show raw entity structure
     if (path === '/debug') {
-      const results = await Promise.allSettled(MTA_FEEDS.map(async url => {
-        const resp = await fetch(url, { cf:{ cacheTtl:20 } });
-        const buf  = await resp.arrayBuffer();
-        const entities = decodeFeed(new Uint8Array(buf));
-        const sample = entities.slice(0,3).map(e => ({
-          id: e.id,
-          hasTrip: !!e.tripUpdate,
-          routeId: e.tripUpdate?.trip?.routeId,
-          stopTimes: e.tripUpdate?.stopTimeUpdate?.length,
-          firstStop: e.tripUpdate?.stopTimeUpdate?.[0]?.stopId,
-        }));
-        return { url: url.split('%2F').pop(), status: resp.status, bytes: buf.byteLength, entities: entities.length, sample };
-      }));
-      return json(results.map(r => r.status==='fulfilled' ? r.value : { error: r.reason?.message }));
+      const url = MTA_FEEDS[0]; // just the 1/2/3/4/5/6/7 feed
+      const resp = await fetch(url, { cf:{ cacheTtl:20 } });
+      const buf  = await resp.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      // Show the first 3 raw entities with ALL fields visible
+      const entities = decodeFeedRaw(bytes).slice(0, 3);
+      return json({ bytes: buf.byteLength, entities });
     }
 
     return json({ error:'Not found. Try /trains/nyc, /health, or /debug' }, 404);
@@ -243,6 +237,46 @@ async function fetchFeed(url) {
   const resp = await fetch(url, { cf:{ cacheTtl:20, cacheEverything:true } });
   if (!resp.ok) throw new Error(`${resp.status}`);
   return decodeFeed(new Uint8Array(await resp.arrayBuffer()));
+}
+
+// Raw decoder — dumps all field numbers without assuming structure
+function decodeFeedRaw(bytes) {
+  const r = new PB(bytes), entities = [];
+  while (r.ok()) {
+    const {f,w} = r.tag();
+    if (f===2&&w===2) {
+      const eb = r.bytes();
+      const er = new PB(eb);
+      const entity = { fields: {} };
+      while (er.ok()) {
+        const {f:ef,w:ew} = er.tag();
+        if (ew===2) {
+          const sub = er.bytes();
+          const sr  = new PB(sub);
+          const subFields = {};
+          while (sr.ok()) {
+            try {
+              const {f:sf,w:sw} = sr.tag();
+              if (sw===2) { const s2=sr.bytes(); subFields[sf]='bytes('+s2.length+')'; }
+              else if (sw===0) { subFields[sf]=sr.varint(); }
+              else if (sw===5) { subFields[sf]=sr.float(); }
+              else { sr.skip(sw); subFields[sf]='wire'+sw; }
+            } catch(e) { break; }
+          }
+          entity.fields[ef] = subFields;
+        } else if (ew===0) {
+          entity.fields[ef] = er.varint();
+        } else if (ew===2) {
+          er.bytes();
+          entity.fields[ef] = 'bytes';
+        } else {
+          er.skip(ew);
+        }
+      }
+      entities.push(entity);
+    } else r.skip(w);
+  }
+  return entities;
 }
 
 // ── GTFS-RT protobuf decoder — trip update focused ───────────
