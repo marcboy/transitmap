@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Poll interval reduced 20s→15s, worker cache TTL matched
+> **Last change:** 2026-05-27 03:55 UTC — version stamp shows exact build time as debug tool
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
