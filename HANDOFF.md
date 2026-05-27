@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-27  
-> **Prototype version:** v2.2  
+> **Prototype version:** v2.5  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -259,6 +259,9 @@ Cities ready to add (all have GTFS-RT feeds):
 <<<<<<< HEAD
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-27 | v2.5 | Project rule: HANDOFF.md must be updated on every code change; added CLAUDE.md |
+| 2026-05-27 | v2.4 | Fix: trains flying across map — distance guard (>0.05° = teleport not lerp); worker uses tripId as stable key |
+| 2026-05-27 | v2.3 | Fix: async race condition — NYC fetch result no longer overwrites status/trains on other cities |
 | 2026-05-27 | v2.2 | Japan Shinkansen city: 6 lines (Tokaido-Sanyo, Tohoku, Joetsu, Hokuriku, Kyushu, Nishi-Kyushu) |
 | 2026-05-27 | v2.1 | Paris live data endpoint added (URL debugging in progress) |
 | 2026-05-27 | v2.0 | Smooth lerp animation — real trains glide between 15s API updates |
