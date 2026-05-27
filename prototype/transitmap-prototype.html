@@ -958,7 +958,7 @@ scheduleAd();
 startRealDataPolling();
 setTimeout(() => {
   if (!isLive) document.getElementById('statusLabel').textContent =
-    WORKER_URL ? 'Connecting to MTA…' : 'Simulated · Deploy worker for live data';
+    WORKER_URL ? 'Connecting to MTA…' : 'Simulated · Deploy worker for live data (no API key needed)';
 }, 1500);
 requestAnimationFrame(loop);
 </script>
