@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Worker: parse trip updates, infer position from stop coords (MTA has no GPS feed)
+> **Last change:** NYC live MTA data working — real trains on map ✅
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
