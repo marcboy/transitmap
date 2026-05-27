@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** 2026-05-27 04:08 UTC — v1.3, removed bottom-right clock, version stamp shows build time only
+> **Last change:** 2026-05-27 04:11 UTC — Seattle live data via Sound Transit OBA feed
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
