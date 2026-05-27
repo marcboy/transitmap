@@ -4,68 +4,38 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TransitMap — Ambient Prototype</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #080c14;
-    --surface: rgba(255,255,255,0.04);
-    --border: rgba(255,255,255,0.07);
-    --muted: rgba(255,255,255,0.35);
-  }
-  html, body { width:100%; height:100%; background:var(--bg); color:#e8edf5; font-family:'DM Mono',monospace; overflow:hidden; user-select:none; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  :root { --bg:#080c14; --surface:rgba(255,255,255,0.04); --border:rgba(255,255,255,0.07); --muted:rgba(255,255,255,0.35); }
+  html,body { width:100%; height:100%; background:var(--bg); color:#e8edf5; font-family:'DM Mono',monospace; overflow:hidden; user-select:none; }
 
-  #map-wrap {
-    position:absolute; top:0; left:0; width:100%; height:100%;
-    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
-  }
+  #map-wrap { position:absolute; top:0; left:0; width:100%; height:100%; transition:width 0.6s cubic-bezier(0.4,0,0.2,1); }
   #map-wrap.ad-active { width:50%; }
+  #leaflet-map { width:100%; height:100%; }
+  .leaflet-control-zoom,.leaflet-control-attribution { display:none!important; }
+  #tint { position:absolute; inset:0; background:rgba(4,8,18,0.2); pointer-events:none; z-index:399; }
+  #trainCanvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:400; }
 
-  /* Single canvas renders everything: tiles + routes + trains */
-  #mainCanvas { position:absolute; top:0; left:0; display:block; }
-
-  /* TOP BAR */
-  .topbar {
-    position:absolute; top:0; left:0; right:0;
-    padding:24px 32px;
-    display:flex; align-items:flex-start; justify-content:space-between;
-    background:linear-gradient(to bottom,rgba(8,12,20,0.9) 0%,transparent 100%);
-    pointer-events:none; z-index:500;
-    transition:right 0.6s cubic-bezier(0.4,0,0.2,1);
-  }
+  .topbar { position:absolute; top:0; left:0; right:0; padding:24px 32px; display:flex; align-items:flex-start; justify-content:space-between; background:linear-gradient(to bottom,rgba(8,12,20,0.92) 0%,transparent 100%); pointer-events:none; z-index:500; transition:right 0.6s cubic-bezier(0.4,0,0.2,1); }
+  .ad-active-ui .topbar,.ad-active-ui .legend { right:50%; }
   .city-name { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; color:#fff; line-height:1; }
   .city-sub  { font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-top:6px; }
-  .status-pill {
-    display:flex; align-items:center; gap:7px;
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:20px; padding:7px 14px; font-size:11px; color:var(--muted);
-  }
+  .status-pill { display:flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:7px 14px; font-size:11px; color:var(--muted); }
   .pulse-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 8px #4ade80; animation:blink 2s ease-in-out infinite; }
   @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-  /* CITY SWITCHER */
-  .city-switcher {
-    position:absolute; top:24px; left:50%; transform:translateX(-50%);
-    display:flex; gap:6px; z-index:500;
-    background:rgba(8,12,20,0.85); border:1px solid var(--border);
-    border-radius:30px; padding:5px; backdrop-filter:blur(12px);
-    white-space:nowrap;
-    transition:left 0.6s cubic-bezier(0.4,0,0.2,1);
-  }
+  .city-switcher { position:absolute; top:24px; left:50%; transform:translateX(-50%); display:flex; gap:6px; z-index:500; background:rgba(8,12,20,0.85); border:1px solid var(--border); border-radius:30px; padding:5px; backdrop-filter:blur(12px); white-space:nowrap; }
   .ad-active-ui .city-switcher { left:25%; }
   .city-btn { font-family:'DM Mono',monospace; font-size:12px; padding:7px 18px; border-radius:20px; border:none; cursor:pointer; color:var(--muted); background:transparent; transition:all 0.25s; }
   .city-btn.active { background:rgba(255,255,255,0.12); color:#fff; }
   .city-btn:hover:not(.active) { color:rgba(255,255,255,0.65); }
 
-  /* LEGEND */
-  .legend {
-    position:absolute; bottom:0; left:0; right:0;
-    padding:28px 32px;
-    background:linear-gradient(to top,rgba(8,12,20,0.9) 0%,transparent 100%);
-    z-index:500; display:flex; align-items:flex-end; justify-content:space-between;
-    transition:right 0.6s cubic-bezier(0.4,0,0.2,1);
-  }
-  .ad-active-ui .topbar, .ad-active-ui .legend { right:50%; }
+  .legend { position:absolute; bottom:0; left:0; right:0; padding:28px 32px; background:linear-gradient(to top,rgba(8,12,20,0.92) 0%,transparent 100%); z-index:500; display:flex; align-items:flex-end; justify-content:space-between; transition:right 0.6s cubic-bezier(0.4,0,0.2,1); }
   .lines-row { display:flex; flex-wrap:wrap; gap:5px; max-width:70%; }
   .line-chip { display:flex; align-items:center; gap:5px; padding:4px 10px 4px 6px; border-radius:20px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); font-size:11px; color:rgba(255,255,255,0.7); }
   .line-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
@@ -76,15 +46,7 @@
   .ad-active-ui .train-count { right:calc(50% + 32px); }
   .train-count span { font-family:'Syne',sans-serif; font-size:24px; font-weight:700; color:rgba(255,255,255,0.55); display:block; line-height:1; }
 
-  /* AD PANEL */
-  .ad-panel {
-    position:absolute; top:0; right:0; width:50%; height:100%;
-    background:#0d1120; border-left:1px solid rgba(255,255,255,0.08);
-    z-index:600; display:flex; flex-direction:column; justify-content:center;
-    padding:48px 44px;
-    transform:translateX(100%); transition:transform 0.6s cubic-bezier(0.4,0,0.2,1);
-    pointer-events:none;
-  }
+  .ad-panel { position:absolute; top:0; right:0; width:50%; height:100%; background:#0d1120; border-left:1px solid rgba(255,255,255,0.08); z-index:600; display:flex; flex-direction:column; justify-content:center; padding:48px 44px; transform:translateX(100%); transition:transform 0.6s cubic-bezier(0.4,0,0.2,1); pointer-events:none; }
   .ad-panel.visible { transform:translateX(0); pointer-events:auto; }
   .ad-panel-inner { max-width:420px; margin:0 auto; width:100%; }
   .ad-top-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
@@ -108,7 +70,9 @@
 <body>
 
 <div id="map-wrap">
-  <canvas id="mainCanvas"></canvas>
+  <div id="leaflet-map"></div>
+  <div id="tint"></div>
+  <canvas id="trainCanvas"></canvas>
 </div>
 
 <div class="city-switcher">
@@ -125,7 +89,7 @@
   </div>
   <div class="status-pill">
     <div class="pulse-dot"></div>
-    <span id="statusLabel">Loading map&hellip;</span>
+    <span id="statusLabel">Loading&hellip;</span>
   </div>
 </div>
 
@@ -136,7 +100,7 @@
   <div>
     <div class="clock-time" id="clockTime">--:--</div>
     <div class="clock-date" id="clockDate">---</div>
-    <div class="version-stamp" id="versionStamp">v1.1</div>
+    <div class="version-stamp" id="versionStamp">v1.2</div>
   </div>
 </div>
 
@@ -158,9 +122,6 @@
 <div class="fade-cover" id="fadeCover"></div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════
-// CITY DATA
-// ═══════════════════════════════════════════════════════════════
 const CITIES = {
   nyc: {
     name:   'New York City',
@@ -692,190 +653,70 @@ const CITIES = {
   };
 
 
-// ═══════════════════════════════════════════════════════════════
-// TILE MAP ENGINE — pure canvas, no external library needed
-// Uses OpenStreetMap/CartoDB tiles drawn directly onto canvas
-// ═══════════════════════════════════════════════════════════════
-
-const TILE_URL = (z,x,y) =>
-  `https://cartodb-basemaps-a.global.ssl.fastly.net/dark_matter/${z}/${x}/${y}.png`;
-
-// Slippy map math
-const TILE_SIZE = 256;
-
-function latLngToTile(lat, lng, zoom) {
-  const n = Math.pow(2, zoom);
-  const x = n * (lng + 180) / 360;
-  const latRad = lat * Math.PI / 180;
-  const y = n * (1 - Math.log(Math.tan(latRad) + 1/Math.cos(latRad)) / Math.PI) / 2;
-  return { x, y };
-}
-
-function tileToLatLng(tx, ty, zoom) {
-  const n = Math.pow(2, zoom);
-  const lng = tx / n * 360 - 180;
-  const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n)));
-  return { lat: latRad * 180 / Math.PI, lng };
-}
-
-// Convert lat/lng to canvas pixel given current view state
-function latLngToPixel(lat, lng) {
-  const tile = latLngToTile(lat, lng, view.zoom);
-  return {
-    x: (tile.x - view.tileOriginX) * TILE_SIZE,
-    y: (tile.y - view.tileOriginY) * TILE_SIZE,
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════
-// VIEW STATE
-// ═══════════════════════════════════════════════════════════════
-
-const canvas = document.getElementById('mainCanvas');
+// ── STATE ────────────────────────────────────────────────────
+let cityId = 'nyc';
+let trains = [];
+let leafletMap, routeLayer;
+const canvas = document.getElementById('trainCanvas');
 const ctx    = canvas.getContext('2d');
 
-let view = {
-  lat: 40.740, lng: -73.980, zoom: 13,
-  tileOriginX: 0, tileOriginY: 0,   // top-left tile (fractional)
-  isDragging: false,
-  dragStartX: 0, dragStartY: 0,
-  dragOriginLng: 0, dragOriginLat: 0,
-};
+// ── LEAFLET INIT — matches Gemini's pattern exactly ─────────
+// Create map immediately (synchronously), then invalidateSize
+// after 200ms to let the browser finish painting the container.
 
-function resize() {
-  canvas.width  = canvas.parentElement.offsetWidth  || window.innerWidth;
-  canvas.height = canvas.parentElement.offsetHeight || window.innerHeight;
-  updateTileOrigin();
+leafletMap = L.map('leaflet-map', {
+  zoomControl:        false,
+  attributionControl: false,
+  dragging:           true,
+  scrollWheelZoom:    true,
+  doubleClickZoom:    false,
+  zoomSnap:           0.5,
+  zoomDelta:          0.5,
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19,
+}).addTo(leafletMap);
+
+routeLayer = L.layerGroup().addTo(leafletMap);
+
+const cfg0 = CITIES[cityId];
+leafletMap.setView(cfg0.center, cfg0.zoom);
+
+// THE FIX — exactly what Gemini did: 200ms after paint, force resize
+setTimeout(() => { leafletMap.invalidateSize(); }, 200);
+
+// Redraw canvas on every map move/zoom
+leafletMap.on('move zoom', () => { drawTrains(); });
+
+// ── RESIZE CANVAS ────────────────────────────────────────────
+function resizeCanvas() {
+  const wrap = document.getElementById('map-wrap');
+  canvas.width  = wrap.offsetWidth;
+  canvas.height = wrap.offsetHeight;
 }
+resizeCanvas();
+window.addEventListener('resize', () => { resizeCanvas(); leafletMap.invalidateSize(); });
 
-function updateTileOrigin() {
-  const centerTile = latLngToTile(view.lat, view.lng, view.zoom);
-  const tilesW = canvas.width  / TILE_SIZE;
-  const tilesH = canvas.height / TILE_SIZE;
-  view.tileOriginX = centerTile.x - tilesW / 2;
-  view.tileOriginY = centerTile.y - tilesH / 2;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TILE CACHE & DRAWING
-// ═══════════════════════════════════════════════════════════════
-
-const tileCache = new Map();
-const MAX_CACHE = 300;
-
-function getTile(z, tx, ty) {
-  const key = `${z}/${tx}/${ty}`;
-  if (tileCache.has(key)) return tileCache.get(key);
-
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.onload = () => { needsRedraw = true; };
-  img.src = TILE_URL(z, tx, ty);
-
-  if (tileCache.size > MAX_CACHE) {
-    // evict oldest
-    const first = tileCache.keys().next().value;
-    tileCache.delete(first);
-  }
-  tileCache.set(key, img);
-  return img;
-}
-
-let needsRedraw = true;
-
-function drawTiles() {
-  const z  = Math.round(view.zoom);
-  const x0 = Math.floor(view.tileOriginX);
-  const y0 = Math.floor(view.tileOriginY);
-  const tilesW = Math.ceil(canvas.width  / TILE_SIZE) + 2;
-  const tilesH = Math.ceil(canvas.height / TILE_SIZE) + 2;
-
-  const offsetX = -(view.tileOriginX - x0) * TILE_SIZE;
-  const offsetY = -(view.tileOriginY - y0) * TILE_SIZE;
-
-  const maxTile = Math.pow(2, z);
-
-  for (let ty = 0; ty < tilesH; ty++) {
-    for (let tx = 0; tx < tilesW; tx++) {
-      const tileX = ((x0 + tx) % maxTile + maxTile) % maxTile;
-      const tileY = y0 + ty;
-      if (tileY < 0 || tileY >= maxTile) continue;
-
-      const img = getTile(z, tileX, tileY);
-      const px  = offsetX + tx * TILE_SIZE;
-      const py  = offsetY + ty * TILE_SIZE;
-
-      if (img.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, px, py, TILE_SIZE, TILE_SIZE);
-      } else {
-        ctx.fillStyle = '#0d1220';
-        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-      }
-    }
-  }
-
-  // Subtle dark tint so train lines pop
-  ctx.fillStyle = 'rgba(4,8,18,0.25)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// DRAW ROUTES
-// ═══════════════════════════════════════════════════════════════
-
+// ── ROUTES ───────────────────────────────────────────────────
 function drawRoutes() {
-  const cfg = CITIES[cityId];
-  cfg.routes.forEach(route => {
-    const pts = route.path.map(([lat,lng]) => latLngToPixel(lat, lng));
-    if (pts.length < 2) return;
-
-    // Glow
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.strokeStyle = route.color + '30';
-    ctx.lineWidth   = 14;
-    ctx.lineCap = ctx.lineJoin = 'round';
-    ctx.stroke();
-
-    // Main line
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.strokeStyle = route.color + 'cc';
-    ctx.lineWidth   = 3.5;
-    ctx.stroke();
-
-    // Station dots
-    pts.forEach(p => {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = route.color + 'cc';
-      ctx.fill();
+  routeLayer.clearLayers();
+  CITIES[cityId].routes.forEach(route => {
+    L.polyline(route.path, { color:route.color, weight:12, opacity:0.12, lineCap:'round', lineJoin:'round' }).addTo(routeLayer);
+    L.polyline(route.path, { color:route.color, weight:3.5, opacity:0.8,  lineCap:'round', lineJoin:'round' }).addTo(routeLayer);
+    route.path.forEach(pt => {
+      L.circleMarker(pt, { radius:4, fillColor:'#0a0d17', color:route.color, fillOpacity:1, weight:2, opacity:0.9 }).addTo(routeLayer);
     });
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
-// TRAIN SIMULATION
-// ═══════════════════════════════════════════════════════════════
-
-let cityId = 'nyc';
-let trains = [];
-
+// ── TRAINS ───────────────────────────────────────────────────
 function spawnTrains() {
   trains = [];
   CITIES[cityId].routes.forEach(route => {
     const n = 5 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) {
-      trains.push({
-        route,
-        t:      Math.random(),
-        speed:  0.00007 + Math.random() * 0.00011,
-        status: Math.random() > 0.75 ? 'STOP' : 'MOVE',
-        stopMs: 0,
-        phase:  Math.random() * Math.PI * 2,
-      });
+      trains.push({ route, t:Math.random(), speed:0.00007+Math.random()*0.0001, status:Math.random()>0.8?'STOP':'MOVE', stopMs:0, phase:Math.random()*Math.PI*2 });
     }
   });
   document.getElementById('trainCountBig').textContent    = trains.length;
@@ -887,10 +728,7 @@ function trainLatLng(tr) {
   const pos  = tr.t * (path.length - 1);
   const i    = Math.min(Math.floor(pos), path.length - 2);
   const f    = pos - i;
-  return [
-    path[i][0] + (path[i+1][0] - path[i][0]) * f,
-    path[i][1] + (path[i+1][1] - path[i][1]) * f,
-  ];
+  return [path[i][0]+(path[i+1][0]-path[i][0])*f, path[i][1]+(path[i+1][1]-path[i][1])*f];
 }
 
 function stepTrains(dt) {
@@ -898,195 +736,116 @@ function stepTrains(dt) {
     tr.phase += 0.05;
     if (tr.status === 'STOP') {
       tr.stopMs += dt;
-      if (tr.stopMs > 1800 + Math.random() * 1200) { tr.status = 'MOVE'; tr.stopMs = 0; }
+      if (tr.stopMs > 2000 + Math.random()*1000) { tr.status='MOVE'; tr.stopMs=0; }
     } else {
-      tr.t += tr.speed * (dt / 16);
-      if (tr.t >= 1) {
-        tr.t = Math.random() * 0.05;
-        if (Math.random() > 0.5) { tr.status = 'STOP'; tr.stopMs = 0; }
-      }
-      if (Math.random() < 0.0015) { tr.status = 'STOP'; tr.stopMs = 0; }
+      tr.t += tr.speed * (dt/16);
+      if (tr.t >= 1) { tr.t=Math.random()*0.04; if (Math.random()>0.4) { tr.status='STOP'; tr.stopMs=0; } }
+      if (Math.random() < 0.001) { tr.status='STOP'; tr.stopMs=0; }
     }
   });
 }
 
 function drawTrains() {
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const bright = ['#FFCD00','#FCCC0A','#B6BD00','#6CBE45','#6ECA97','#A7A9AC','#FF9500','#C3A400'];
+
   trains.forEach(tr => {
-    const [lat, lng] = trainLatLng(tr);
-    const { x, y }  = latLngToPixel(lat, lng);
+    const ll  = trainLatLng(tr);
+    const pt  = leafletMap.latLngToContainerPoint(ll);
+    const x=pt.x, y=pt.y;
+    if (x<-40||x>w+40||y<-40||y>h+40) return;
 
-    if (x < -30 || x > canvas.width+30 || y < -30 || y > canvas.height+30) return;
-
-    const r     = 10;
-    const pulse = (Math.sin(tr.phase) + 1) / 2;
+    const r     = 11;
+    const pulse = (Math.sin(tr.phase)+1)/2;
     const col   = tr.route.color;
 
-    // Pulse ring
-    if (tr.status === 'STOP') {
-      ctx.beginPath();
-      ctx.arc(x, y, r * (1.8 + pulse), 0, Math.PI*2);
-      const a = Math.round(pulse * 120).toString(16).padStart(2,'0');
-      ctx.strokeStyle = col + a;
-      ctx.lineWidth   = 2;
-      ctx.stroke();
+    // Glow halo
+    const grd = ctx.createRadialGradient(x,y,0,x,y,r*3.5);
+    grd.addColorStop(0, col+'be');
+    grd.addColorStop(0.3, col+'50');
+    grd.addColorStop(1, col+'00');
+    ctx.beginPath(); ctx.arc(x,y,r*3.5,0,Math.PI*2); ctx.fillStyle=grd; ctx.fill();
+
+    // Pulse ring when stopped
+    if (tr.status==='STOP') {
+      const a = Math.round(pulse*150).toString(16).padStart(2,'0');
+      ctx.beginPath(); ctx.arc(x,y,r*(1.7+pulse*0.9),0,Math.PI*2);
+      ctx.strokeStyle=col+a; ctx.lineWidth=2; ctx.stroke();
     }
 
-    // Glow
-    const grd = ctx.createRadialGradient(x,y,0, x,y,r*3);
-    grd.addColorStop(0, col+'bb');
-    grd.addColorStop(1, col+'00');
-    ctx.beginPath();
-    ctx.arc(x, y, r*3, 0, Math.PI*2);
-    ctx.fillStyle = grd;
-    ctx.fill();
-
     // Circle
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI*2);
-    ctx.fillStyle = col;
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=col; ctx.fill();
 
-    // White ring
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI*2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth   = 1.5;
-    ctx.stroke();
+    // White rim
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1.8; ctx.stroke();
 
     // Label
-    const bright = ['#FFCD00','#FCCC0A','#B6BD00','#6CBE45','#6ECA97','#A7A9AC','#FF9500','#C3A400'];
-    ctx.fillStyle     = bright.includes(col) ? '#111' : '#fff';
-    ctx.font          = 'bold 8px DM Mono,monospace';
+    ctx.fillStyle     = bright.includes(col.toUpperCase()) ? '#0a0c10' : '#ffffff';
+    ctx.font          = 'bold 9.5px DM Mono,monospace';
     ctx.textAlign     = 'center';
     ctx.textBaseline  = 'middle';
-    ctx.fillText(tr.route.id, x, y + 0.5);
+    ctx.fillText(tr.route.id, x, y+0.5);
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
-// RENDER LOOP
-// ═══════════════════════════════════════════════════════════════
-
+// ── RENDER LOOP ───────────────────────────────────────────────
 let last = 0;
 function loop(ts) {
-  const dt = Math.min(ts - last, 100);
+  const dt = Math.min(ts-last, 100);
   last = ts;
   stepTrains(dt);
-  updateTileOrigin();
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawTiles();
-  drawRoutes();
   drawTrains();
-
   requestAnimationFrame(loop);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// PAN & ZOOM
-// ═══════════════════════════════════════════════════════════════
-
-canvas.addEventListener('mousedown', e => {
-  view.isDragging   = true;
-  view.dragStartX   = e.clientX;
-  view.dragStartY   = e.clientY;
-  view.dragOriginLat = view.lat;
-  view.dragOriginLng = view.lng;
-  canvas.style.cursor = 'grabbing';
-});
-
-window.addEventListener('mousemove', e => {
-  if (!view.isDragging) return;
-  const dx = e.clientX - view.dragStartX;
-  const dy = e.clientY - view.dragStartY;
-  const scale = 1 / (TILE_SIZE * Math.pow(2, view.zoom));
-  // Convert pixel delta to lat/lng delta
-  const centerTile = latLngToTile(view.dragOriginLat, view.dragOriginLng, view.zoom);
-  const newTileX = centerTile.x - dx / TILE_SIZE;
-  const newTileY = centerTile.y - dy / TILE_SIZE;
-  const n = Math.pow(2, view.zoom);
-  view.lng = newTileX / n * 360 - 180;
-  const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * newTileY / n)));
-  view.lat = latRad * 180 / Math.PI;
-});
-
-window.addEventListener('mouseup', () => {
-  view.isDragging = false;
-  canvas.style.cursor = 'default';
-});
-
-canvas.addEventListener('wheel', e => {
-  e.preventDefault();
-  const zoomDelta = e.deltaY < 0 ? 0.5 : -0.5;
-  view.zoom = Math.max(10, Math.min(17, view.zoom + zoomDelta));
-}, { passive: false });
-
-// ═══════════════════════════════════════════════════════════════
-// CITY SWITCH
-// ═══════════════════════════════════════════════════════════════
-
+// ── CITY SWITCH ───────────────────────────────────────────────
 function switchCity(id, btn) {
-  if (id === cityId) return;
+  if (id===cityId) return;
   const cover = document.getElementById('fadeCover');
   cover.classList.add('active');
   setTimeout(() => {
-    cityId   = id;
+    cityId = id;
     const cfg = CITIES[id];
-    view.lat  = cfg.center[0];
-    view.lng  = cfg.center[1];
-    view.zoom = cfg.zoom;
     document.getElementById('cityName').textContent = cfg.name;
+    leafletMap.setView(cfg.center, cfg.zoom, {animate:false});
+    // invalidateSize again after city switch in case container shifted
+    setTimeout(() => { leafletMap.invalidateSize(); }, 200);
+    drawRoutes();
     spawnTrains();
     renderLegend();
-    document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.city-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     setTimeout(() => cover.classList.remove('active'), 380);
   }, 350);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// LEGEND
-// ═══════════════════════════════════════════════════════════════
-
+// ── LEGEND ────────────────────────────────────────────────────
 function renderLegend() {
   document.getElementById('linesRow').innerHTML = CITIES[cityId].lines.map(l =>
-    `<div class="line-chip">
-       <div class="line-dot" style="background:${l.color};box-shadow:0 0 5px ${l.color}88"></div>
-       ${l.name}
-     </div>`
+    `<div class="line-chip"><div class="line-dot" style="background:${l.color};box-shadow:0 0 5px ${l.color}88"></div>${l.name}</div>`
   ).join('');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CLOCK + VERSION
-// ═══════════════════════════════════════════════════════════════
-
-const VERSION   = 'v1.1';
-const LAST_EDIT = '2026-05-26';
-
+// ── CLOCK ─────────────────────────────────────────────────────
+const VERSION='v1.2', LAST_EDIT='2026-05-26';
 function tick() {
-  const n  = new Date();
-  const hh = String(n.getHours()).padStart(2,'0');
-  const mm = String(n.getMinutes()).padStart(2,'0');
-  const ss = String(n.getSeconds()).padStart(2,'0');
-  document.getElementById('clockTime').textContent = `${hh}:${mm}`;
-  document.getElementById('clockDate').textContent = n.toLocaleDateString('en-US',
-    { weekday:'short', month:'short', day:'numeric' }).toUpperCase();
-  document.getElementById('versionStamp').textContent =
-    `${VERSION} · ${LAST_EDIT} · ${hh}:${mm}:${ss}`;
+  const n=new Date();
+  const hh=String(n.getHours()).padStart(2,'0');
+  const mm=String(n.getMinutes()).padStart(2,'0');
+  const ss=String(n.getSeconds()).padStart(2,'0');
+  document.getElementById('clockTime').textContent=`${hh}:${mm}`;
+  document.getElementById('clockDate').textContent=n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}).toUpperCase();
+  document.getElementById('versionStamp').textContent=`${VERSION} · ${LAST_EDIT} · ${hh}:${mm}:${ss}`;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ADS
-// ═══════════════════════════════════════════════════════════════
-
-const AD_INTERVAL = 5 * 60 * 1000;
-const AD_DURATION = 30 * 1000;
+// ── ADS ───────────────────────────────────────────────────────
+const AD_INTERVAL=5*60*1000, AD_DURATION=30*1000;
 let adTimeout, adAutoDismiss;
 
 function scheduleAd() {
-  clearTimeout(adTimeout);
-  clearTimeout(adAutoDismiss);
+  clearTimeout(adTimeout); clearTimeout(adAutoDismiss);
   adTimeout = setTimeout(showAd, AD_INTERVAL);
 }
 
@@ -1095,50 +854,39 @@ function showAd() {
   document.body.classList.add('ad-active-ui');
   document.getElementById('adPanel').classList.add('visible');
   document.getElementById('adDivider').classList.add('visible');
-  setTimeout(resize, 650);
-  const fill = document.getElementById('adTimerFill');
-  fill.style.transition = 'none'; fill.style.transform = 'scaleX(1)';
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    fill.style.transition = `transform ${AD_DURATION/1000}s linear`;
-    fill.style.transform  = 'scaleX(0)';
+  // Keep calling invalidateSize during the CSS transition
+  const iv = setInterval(()=>leafletMap.invalidateSize(), 50);
+  setTimeout(()=>{ clearInterval(iv); leafletMap.invalidateSize(); }, 700);
+  const fill=document.getElementById('adTimerFill');
+  fill.style.transition='none'; fill.style.transform='scaleX(1)';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    fill.style.transition=`transform ${AD_DURATION/1000}s linear`;
+    fill.style.transform='scaleX(0)';
   }));
-  adAutoDismiss = setTimeout(closeAd, AD_DURATION);
+  adAutoDismiss=setTimeout(closeAd, AD_DURATION);
 }
 
 function closeAd() {
   clearTimeout(adAutoDismiss);
   document.getElementById('adPanel').classList.remove('visible');
   document.getElementById('adDivider').classList.remove('visible');
-  setTimeout(() => {
+  setTimeout(()=>{
     document.getElementById('map-wrap').classList.remove('ad-active');
     document.body.classList.remove('ad-active-ui');
-    setTimeout(resize, 650);
+    const iv=setInterval(()=>leafletMap.invalidateSize(),50);
+    setTimeout(()=>{ clearInterval(iv); leafletMap.invalidateSize(); },700);
   }, 600);
   scheduleAd();
 }
 
-// ═══════════════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════════════
-
-window.addEventListener('resize', resize);
-resize();
-
-const cfg0 = CITIES[cityId];
-view.lat  = cfg0.center[0];
-view.lng  = cfg0.center[1];
-view.zoom = cfg0.zoom;
-
-renderLegend();
+// ── INIT ──────────────────────────────────────────────────────
+drawRoutes();
 spawnTrains();
+renderLegend();
 tick();
 setInterval(tick, 1000);
 scheduleAd();
-
-setTimeout(() => {
-  document.getElementById('statusLabel').textContent = 'Live · 20s refresh';
-}, 1500);
-
+setTimeout(()=>{ document.getElementById('statusLabel').textContent='Live · 20s refresh'; }, 1500);
 requestAnimationFrame(loop);
 </script>
 </body>
