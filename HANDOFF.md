@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Real MTA data wired up — worker + prototype ready, needs API key + deploy
+> **Last change:** MTA feeds now open — no API key required, worker simplified
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
@@ -108,7 +108,7 @@ All tracks share the same GTFS-RT data sources. No architecture changes needed t
 ## Setup Checklist (to go from repo → running app)
 
 ### Step 1 — API Keys (free)
-- [ ] MTA: Sign up at https://api.mta.info/#/signup → paste key into `CityConfig.swift`
+- [x] MTA: No API key required (open as of 2025) ✓
 - [ ] IDFM: Register at https://prim.iledefrance-mobilites.fr → paste key into `CityConfig.swift`
 
 ### Step 2 — AdMob
@@ -208,6 +208,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | MTA feeds now open — API key no longer required (confirmed 2025) |
 | 2026-05-26 | Real MTA data: worker rewritten as single file, prototype polls worker every 20s |
 | 2026-05-26 | UI readability: muted text opacity raised across all elements |
 | 2026-05-26 | Map fix: reverted to Leaflet, applied 200ms invalidateSize pattern (credit: Gemini) |
