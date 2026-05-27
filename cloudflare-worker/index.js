@@ -185,47 +185,63 @@ async function fetchAllMTATrains() {
 
   const trains = [];
   const seen   = new Set();
+  const now    = Math.floor(Date.now() / 1000);
 
   for (const result of results) {
     if (result.status !== 'fulfilled') continue;
     for (const entity of result.value) {
-      if (!entity.tripUpdate) continue;
 
-      const tu      = entity.tripUpdate;
-      const routeId = tu.trip?.routeId ?? '';
-      if (!routeId || !LINE_COLORS[routeId]) continue;
-
-      // Find the first upcoming stop with a known location
-      const stopUpdates = tu.stopTimeUpdate ?? [];
-      let position = null;
-
-      for (const su of stopUpdates) {
-        const stopId = su.stopId?.replace(/[NS]$/, '');  // strip N/S suffix
-        const coords = STOPS[stopId];
-        if (coords) {
-          position = { lat: coords[0], lng: coords[1], stopId: su.stopId };
-          break;
-        }
+      // Vehicle position entity — real GPS coords
+      if (entity.vehicle?.position) {
+        const v = entity.vehicle;
+        const routeId = v.trip?.routeId ?? '';
+        if (!routeId || !LINE_COLORS[routeId]) continue;
+        const stale = now - (v.timestamp ?? now);
+        if (stale > 180) continue;
+        if (seen.has(entity.id)) continue;
+        seen.add(entity.id);
+        trains.push({
+          id:     entity.id,
+          line:   routeId,
+          color:  LINE_COLORS[routeId],
+          lat:    Math.round(v.position.latitude  * 100000) / 100000,
+          lng:    Math.round(v.position.longitude * 100000) / 100000,
+          bearing: v.position.bearing ? Math.round(v.position.bearing) : null,
+          status: ['INCOMING','AT_STOP','IN_TRANSIT'][v.currentStatus] ?? 'IN_TRANSIT',
+          source: 'gps',
+        });
+        continue;
       }
 
-      if (!position) continue;
+      // Trip update entity — infer position from next stop coords
+      if (entity.tripUpdate) {
+        const tu = entity.tripUpdate;
+        const routeId = tu.trip?.routeId ?? '';
+        if (!routeId || !LINE_COLORS[routeId]) continue;
+        if (seen.has(entity.id)) continue;
 
-      const key = `${routeId}-${entity.id}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+        let position = null;
+        for (const su of (tu.stopTimeUpdate ?? [])) {
+          const stopId = su.stopId?.replace(/[NS]$/, '');
+          const coords = STOPS[stopId];
+          if (coords) { position = { lat: coords[0], lng: coords[1] }; break; }
+        }
+        if (!position) continue;
 
-      trains.push({
-        id:     entity.id,
-        line:   routeId,
-        color:  LINE_COLORS[routeId],
-        lat:    position.lat,
-        lng:    position.lng,
-        stopId: position.stopId,
-        status: 'IN_TRANSIT',
-      });
+        seen.add(entity.id);
+        trains.push({
+          id:    entity.id,
+          line:  routeId,
+          color: LINE_COLORS[routeId],
+          lat:   position.lat,
+          lng:   position.lng,
+          bearing: null,
+          status: 'IN_TRANSIT',
+          source: 'stop',
+        });
+      }
     }
   }
-
   return trains;
 }
 
@@ -292,14 +308,27 @@ function decodeFeed(bytes) {
 }
 
 function decodeEntity(bytes) {
-  const r = new PB(bytes), e = {id:'', tripUpdate:null};
+  const r = new PB(bytes);
+  const e = { id:'', tripUpdate:null, vehicle:null };
   while (r.ok()) {
     const {f,w} = r.tag();
-    if      (f===1&&w===2) e.id         = r.str();
+    if      (f===1&&w===2) e.id         = readEntityId(r.bytes()); // id is nested
     else if (f===3&&w===2) e.tripUpdate = decodeTripUpdate(r.bytes());
+    else if (f===4&&w===2) e.vehicle    = decodeVehicle(r.bytes()); // vehicle position
     else r.skip(w);
   }
   return e;
+}
+
+// The id field is itself a message with field 6 = the string bytes
+function readEntityId(bytes) {
+  const r = new PB(bytes);
+  while (r.ok()) {
+    const {f,w} = r.tag();
+    if (f===6&&w===2) return r.str();
+    else r.skip(w);
+  }
+  return '';
 }
 
 function decodeTripUpdate(bytes) {
@@ -337,14 +366,31 @@ function decodeStopTimeUpdate(bytes) {
   return s;
 }
 
-function decodeStopEvent(bytes) {
-  const r = new PB(bytes), e = {time:0};
+function decodeVehicle(bytes) {
+  const r = new PB(bytes);
+  const v = { trip:{routeId:'',tripId:''}, position:null, currentStatus:2, timestamp:0 };
   while (r.ok()) {
     const {f,w} = r.tag();
-    if (f===2&&w===0) e.time = r.varint();
+    if      (f===1&&w===2) v.trip          = decodeTrip(r.bytes());
+    else if (f===2&&w===2) v.position      = decodePosition(r.bytes());
+    else if (f===4&&w===0) v.currentStatus = r.varint();
+    else if (f===5&&w===0) v.timestamp     = r.varint();
+    else if (f===7&&w===2) v.stopId        = r.str();
     else r.skip(w);
   }
-  return e;
+  return v;
+}
+
+function decodePosition(bytes) {
+  const r = new PB(bytes), p = { latitude:0, longitude:0, bearing:null };
+  while (r.ok()) {
+    const {f,w} = r.tag();
+    if      (f===1&&w===5) p.latitude  = r.float();
+    else if (f===2&&w===5) p.longitude = r.float();
+    else if (f===3&&w===5) p.bearing   = r.float();
+    else r.skip(w);
+  }
+  return p;
 }
 
 class PB {
