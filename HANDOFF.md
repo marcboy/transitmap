@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-27  
-> **Prototype version:** v2.6  
+> **Prototype version:** v2.7  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -259,6 +259,7 @@ Cities ready to add (all have GTFS-RT feeds):
 <<<<<<< HEAD
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-27 | v2.7 | Fix GitHub Pages stale cache: no-cache meta tags + ?v= query string in index.html redirect |
 | 2026-05-27 | v2.6 | Version stamp now shows time in Pacific Time (e.g. "v2.6 · built 2026-05-27 · 16:45 PT") |
 | 2026-05-27 | v2.5 | Project rule: HANDOFF.md must be updated on every code change; added CLAUDE.md |
 | 2026-05-27 | v2.4 | Fix: trains flying across map — distance guard (>0.05° = teleport not lerp); worker uses tripId as stable key |
