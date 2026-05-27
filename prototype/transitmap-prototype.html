@@ -78,6 +78,7 @@
   <button class="city-btn"        onclick="switchCity('paris',this)">&#127467;&#127479; Paris</button>
   <button class="city-btn"        onclick="switchCity('seattle',this)">&#127482;&#127480; Seattle</button>
   <button class="city-btn"        onclick="switchCity('tokyo',this)">&#127471;&#127477; Tokyo</button>
+  <button class="city-btn"        onclick="switchCity('japan',this)">&#127477; Shinkansen</button>
 </div>
 
 <div class="topbar">
@@ -542,6 +543,98 @@ const CITIES = {
   };
 
 
+// ── Japan Shinkansen — all 6 main lines ──────────────────────
+  CITIES.japan = {
+    name:     'Japan · Shinkansen',
+    center:   [36.2, 136.5],
+    zoom:     6,
+    timezone: 'Asia/Tokyo',
+    lines: [
+      { id:'T', name:'Tokaido-Sanyo', color:'#003087' },
+      { id:'N', name:'Tohoku',        color:'#007B40' },
+      { id:'J', name:'Joetsu',        color:'#F58220' },
+      { id:'H', name:'Hokuriku',      color:'#7B489B' },
+      { id:'K', name:'Kyushu',        color:'#CE0E2D' },
+      { id:'W', name:'Nishi-Kyushu',  color:'#FF6B35' },
+    ],
+    routes: [
+      // Tokaido-Sanyo — Tokyo → Hakata (dark blue)
+      { id:'T', color:'#003087', path:[
+        [35.6812,139.7671], // Tokyo
+        [35.4663,139.6201], // Shin-Yokohama
+        [35.2516,139.1694], // Odawara
+        [35.0974,139.0748], // Atami
+        [35.1286,138.9117], // Mishima
+        [35.1494,138.6758], // Shin-Fuji
+        [34.9728,138.4049], // Shizuoka
+        [34.7130,137.7267], // Hamamatsu
+        [34.7695,137.3912], // Toyohashi
+        [35.1709,136.8815], // Nagoya
+        [35.3158,136.2853], // Maibara
+        [34.9854,135.7588], // Kyoto
+        [34.7330,135.5003], // Shin-Osaka
+        [34.6921,135.1975], // Shin-Kobe
+        [34.8258,134.6867], // Himeji
+        [34.6572,133.9168], // Okayama
+        [34.3964,132.4597], // Hiroshima
+        [34.1729,131.4709], // Shin-Yamaguchi
+        [33.8840,130.8751], // Kokura
+        [33.5899,130.4219], // Hakata
+      ]},
+      // Tohoku — Tokyo → Shin-Aomori (green)
+      { id:'N', color:'#007B40', path:[
+        [35.6812,139.7671], // Tokyo
+        [35.9072,139.6244], // Omiya
+        [36.5581,139.8978], // Utsunomiya
+        [37.0636,140.2011], // Nasu-Shiobara
+        [37.3997,140.4679], // Koriyama
+        [37.7543,140.4681], // Fukushima
+        [38.2597,140.8826], // Sendai
+        [38.7324,141.1296], // Ichinoseki
+        [39.7012,141.1339], // Morioka
+        [40.5126,141.4885], // Hachinohe
+        [40.7831,140.7143], // Shin-Aomori
+      ]},
+      // Joetsu — Omiya → Niigata (orange)
+      { id:'J', color:'#F58220', path:[
+        [35.9072,139.6244], // Omiya
+        [36.1471,139.3882], // Kumagaya
+        [36.3224,139.0042], // Takasaki
+        [36.9268,138.8115], // Echigo-Yuzawa
+        [37.4473,138.8478], // Nagaoka
+        [37.9161,139.0592], // Niigata
+      ]},
+      // Hokuriku — Takasaki → Tsuruga (purple)
+      { id:'H', color:'#7B489B', path:[
+        [36.3224,139.0042], // Takasaki
+        [36.3449,138.5973], // Karuizawa
+        [36.6432,138.1882], // Nagano
+        [37.1249,138.2296], // Joetsumyoko
+        [36.9122,137.8681], // Itoigawa
+        [36.7066,137.2137], // Toyama
+        [36.5781,136.6478], // Kanazawa
+        [36.0652,136.2196], // Fukui
+        [35.6519,136.0817], // Tsuruga
+      ]},
+      // Kyushu — Hakata → Kagoshima-Chuo (red)
+      { id:'K', color:'#CE0E2D', path:[
+        [33.5899,130.4219], // Hakata
+        [33.3108,130.5216], // Kurume
+        [32.7898,130.7417], // Kumamoto
+        [31.8690,130.7524], // Sendai (Kagoshima)
+        [31.5872,130.5381], // Kagoshima-Chuo
+      ]},
+      // Nishi-Kyushu — Hakata → Nagasaki (coral)
+      { id:'W', color:'#FF6B35', path:[
+        [33.5899,130.4219], // Hakata
+        [33.3502,130.2100], // Shin-Tosu area
+        [33.1262,130.0636], // Ureshino-Onsen
+        [33.0400,129.9600], // Shin-Omura
+        [32.9006,129.8590], // Nagasaki
+      ]},
+    ],
+  };
+
 // ── STATE ────────────────────────────────────────────────────
 let cityId = 'nyc';
 let trains = [];
@@ -832,7 +925,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v2.1', LAST_EDIT='2026-05-27 04:34 UTC'; // updated on every push
+const VERSION='v2.2', LAST_EDIT='2026-05-27 UTC'; // updated on every push
 function tick() {
   const n=new Date();
   const hh=String(n.getHours()).padStart(2,'0');

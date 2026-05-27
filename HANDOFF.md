@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-27  
-> **Prototype version:** v2.1  
+> **Prototype version:** v2.2  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -256,8 +256,10 @@ Cities ready to add (all have GTFS-RT feeds):
 
 ## Change Log
 
+<<<<<<< HEAD
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-27 | v2.2 | Japan Shinkansen city: 6 lines (Tokaido-Sanyo, Tohoku, Joetsu, Hokuriku, Kyushu, Nishi-Kyushu) |
 | 2026-05-27 | v2.1 | Paris live data endpoint added (URL debugging in progress) |
 | 2026-05-27 | v2.0 | Smooth lerp animation — real trains glide between 15s API updates |
 | 2026-05-27 | v1.9 | NYC routes rebuilt from real GTFS stop coordinates — all 24 lines accurate |
@@ -270,3 +272,31 @@ Cities ready to add (all have GTFS-RT feeds):
 | 2026-05-27 | v1.2 | Local city date/time added top-left; muted text brightened |
 | 2026-05-27 | v1.1 | Real MTA train data live; worker deployed; 15s polling; position lerp |
 | 2026-05-26 | v1.0 | Initial prototype: Leaflet maps, simulated trains, split-screen ads |
+=======
+| Date | Change |
+|---|---|
+| 2026-05-27 | Japan Shinkansen city: 6 lines (Tokaido-Sanyo, Tohoku, Joetsu, Hokuriku, Kyushu, Nishi-Kyushu) |
+| 2026-05-26 | Worker deployed: https://transitmap.marcboyer-public.workers.dev |
+| 2026-05-26 | MTA feeds now open — API key no longer required (confirmed 2025) |
+| 2026-05-26 | Real MTA data: worker rewritten as single file, prototype polls worker every 20s |
+| 2026-05-26 | UI readability: muted text opacity raised across all elements |
+| 2026-05-26 | Map fix: reverted to Leaflet, applied 200ms invalidateSize pattern (credit: Gemini) |
+| 2026-05-26 | Replaced Leaflet entirely with custom canvas tile engine (no init-sizing dependency) |
+| 2026-05-26 | Root fix: L.map() moved inside window.load — tiles were never loading before |
+| 2026-05-26 | Tokyo: all 13 subway lines (Tokyo Metro + Toei) |
+| 2026-05-26 | Version stamp + edit time shown next to clock |
+| 2026-05-26 | Train density: 5-8 per route (was 3-7) |
+| 2026-05-26 | NYC: all 23 lines with full route paths added |
+| 2026-05-26 | Seattle: 1 Line=red, 2 Line=blue (correct Sound Transit colors) |
+| 2026-05-26 | Fix: city map tiles disappeared — Leaflet invalidateSize + window.load init |
+| 2026-05-26 | Paris: all 16 lines added (M1-M14 incl. 3b, 7b) with full station coords |
+| 2026-05-26 | Map brightness fixed: dark_matter_lite tiles + tint reduced 0.55→0.18 |
+| 2026-05-26 | Prototype hosted on GitHub Pages: https://marcboy.github.io/transitmap/ |
+| 2026-05-26 | Seattle: fixed 2 Line path via I-90 bridge + shared downtown tunnel stations with 1 Line | |
+| 2026-05-26 | Removed Cloudflare dependency — direct feed fetching on-device |
+| 2026-05-26 | Added `Config/CityConfig.swift` — all city config on-device |
+| 2026-05-26 | Ad format changed: fullscreen overlay → split-screen (half map, half ad) |
+| 2026-05-26 | Ad timer fixed: was firing every 15s in prototype, now correct 5-minute interval |
+| 2026-05-26 | Prototype bug fixed: Unicode minus signs in coordinates caused blank screen |
+| 2026-05-26 | Initial project scaffolded: Cloudflare Worker + SwiftUI app + HTML prototype |
+>>>>>>> 3a59845 (v2.2: Japan Shinkansen — 6 lines across Honshu and Kyushu)
