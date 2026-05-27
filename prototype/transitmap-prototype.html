@@ -710,39 +710,108 @@ function drawRoutes() {
   });
 }
 
-// ── TRAINS ───────────────────────────────────────────────────
+// ── TRAINS — real data for NYC, simulation for other cities ──
+
+// ⚠️ Set this to your deployed Cloudflare Worker URL after deploying
+// e.g. 'https://transitmap-worker.YOUR-SUBDOMAIN.workers.dev'
+const WORKER_URL = '';   // ← paste your worker URL here
+
+let isLive = false;  // true once real data is flowing
+
+// Simulation fallback — used for Paris, Seattle, Tokyo
+// and for NYC until the worker is deployed
 function spawnTrains() {
   trains = [];
   CITIES[cityId].routes.forEach(route => {
     const n = 5 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) {
-      trains.push({ route, t:Math.random(), speed:0.00007+Math.random()*0.0001, status:Math.random()>0.8?'STOP':'MOVE', stopMs:0, phase:Math.random()*Math.PI*2 });
+      trains.push({
+        route, t: Math.random(),
+        speed: 0.00007 + Math.random() * 0.0001,
+        status: Math.random() > 0.8 ? 'STOP' : 'MOVE',
+        stopMs: 0, phase: Math.random() * Math.PI * 2,
+        real: false,
+      });
     }
   });
+  syncCount();
+}
+
+// Fetch real trains from worker and merge into simulation format
+async function fetchRealTrains() {
+  if (!WORKER_URL || cityId !== 'nyc') return;
+  try {
+    const resp = await fetch(`${WORKER_URL}/trains/nyc`);
+    if (!resp.ok) throw new Error(`Worker ${resp.status}`);
+    const data = await resp.json();
+
+    // Convert real trains into the same format as simulated trains
+    // so drawTrains() works identically for both
+    const realTrains = data.trains.map(t => {
+      // Find the matching route for color/id lookup
+      const route = CITIES.nyc.routes.find(r => r.id === t.line)
+                 ?? { id: t.line, color: t.color, path: [] };
+      return {
+        route,
+        // Real trains have fixed lat/lng — no t/path interpolation needed
+        realLat: t.lat,
+        realLng: t.lng,
+        bearing: t.bearing,
+        status:  t.status === 'AT_STOP' ? 'STOP' : 'MOVE',
+        stopMs:  0,
+        phase:   Math.random() * Math.PI * 2,
+        real:    true,
+      };
+    });
+
+    if (realTrains.length > 0) {
+      trains = realTrains;
+      isLive = true;
+      document.getElementById('statusLabel').textContent = `Live · ${data.count} trains · MTA`;
+      syncCount();
+    }
+  } catch (e) {
+    console.warn('Worker fetch failed, staying on simulation:', e.message);
+  }
+}
+
+function syncCount() {
   document.getElementById('trainCountBig').textContent    = trains.length;
   document.getElementById('trainCountInline').textContent = trains.length;
 }
 
+// Returns [lat, lng] for any train — real or simulated
 function trainLatLng(tr) {
+  if (tr.real) return [tr.realLat, tr.realLng];
   const path = tr.route.path;
-  const pos  = tr.t * (path.length - 1);
-  const i    = Math.min(Math.floor(pos), path.length - 2);
-  const f    = pos - i;
-  return [path[i][0]+(path[i+1][0]-path[i][0])*f, path[i][1]+(path[i+1][1]-path[i][1])*f];
+  if (!path || path.length < 2) return [0, 0];
+  const pos = tr.t * (path.length - 1);
+  const i   = Math.min(Math.floor(pos), path.length - 2);
+  const f   = pos - i;
+  return [path[i][0] + (path[i+1][0] - path[i][0]) * f,
+          path[i][1] + (path[i+1][1] - path[i][1]) * f];
 }
 
 function stepTrains(dt) {
   trains.forEach(tr => {
     tr.phase += 0.05;
+    if (tr.real) return;   // real trains don't move — position comes from API
     if (tr.status === 'STOP') {
       tr.stopMs += dt;
-      if (tr.stopMs > 2000 + Math.random()*1000) { tr.status='MOVE'; tr.stopMs=0; }
+      if (tr.stopMs > 2000 + Math.random() * 1000) { tr.status = 'MOVE'; tr.stopMs = 0; }
     } else {
-      tr.t += tr.speed * (dt/16);
-      if (tr.t >= 1) { tr.t=Math.random()*0.04; if (Math.random()>0.4) { tr.status='STOP'; tr.stopMs=0; } }
-      if (Math.random() < 0.001) { tr.status='STOP'; tr.stopMs=0; }
+      tr.t += tr.speed * (dt / 16);
+      if (tr.t >= 1) { tr.t = Math.random() * 0.04; if (Math.random() > 0.4) { tr.status = 'STOP'; tr.stopMs = 0; } }
+      if (Math.random() < 0.001) { tr.status = 'STOP'; tr.stopMs = 0; }
     }
   });
+}
+
+// Poll real data every 20s for NYC
+function startRealDataPolling() {
+  if (!WORKER_URL) return;
+  fetchRealTrains();
+  setInterval(() => { if (cityId === 'nyc') fetchRealTrains(); }, 20000);
 }
 
 function drawTrains() {
@@ -886,7 +955,11 @@ renderLegend();
 tick();
 setInterval(tick, 1000);
 scheduleAd();
-setTimeout(()=>{ document.getElementById('statusLabel').textContent='Live · 20s refresh'; }, 1500);
+startRealDataPolling();
+setTimeout(() => {
+  if (!isLive) document.getElementById('statusLabel').textContent =
+    WORKER_URL ? 'Connecting to MTA…' : 'Simulated · Deploy worker for live data';
+}, 1500);
 requestAnimationFrame(loop);
 </script>
 </body>
