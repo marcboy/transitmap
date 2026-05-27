@@ -762,7 +762,7 @@ async function fetchRealTrains() {
     if (realTrains.length > 0) {
       trains = realTrains;
       isLive = true;
-      document.getElementById('statusLabel').textContent = `Live · ${data.count} trains · MTA`;
+      document.getElementById('statusLabel').textContent = `Live · ${data.count} trains · MTA · 15s`;
       syncCount();
     }
   } catch (e) {
@@ -815,7 +815,8 @@ function stepTrains(dt) {
 function startRealDataPolling() {
   if (!WORKER_URL) return;
   fetchRealTrains();
-  setInterval(() => { if (cityId === 'nyc') fetchRealTrains(); }, 20000);
+  // Poll every 15s — MTA feed updates every 30s, this catches it fast
+  setInterval(() => { if (cityId === 'nyc') fetchRealTrains(); }, 15000);
 }
 
 function drawTrains() {
