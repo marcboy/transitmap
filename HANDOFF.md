@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** MTA feeds now open — no API key required, worker simplified
+> **Last change:** Worker live — NYC now showing real MTA train positions
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
@@ -208,6 +208,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | Worker deployed: https://transitmap.marcboyer-public.workers.dev |
 | 2026-05-26 | MTA feeds now open — API key no longer required (confirmed 2025) |
 | 2026-05-26 | Real MTA data: worker rewritten as single file, prototype polls worker every 20s |
 | 2026-05-26 | UI readability: muted text opacity raised across all elements |
