@@ -748,29 +748,14 @@ async function fetchRealTrains() {
     const realTrains = data.trains.map(t => {
       const route = CITIES.nyc.routes.find(r => r.id === t.line)
                  ?? { id: t.line, color: t.color, path: [] };
-
-      // Find the closest point on the route path to snap the train to
-      // This lets us interpolate smoothly toward the next stop
-      const path = route.path;
-      let closestIdx = 0, closestDist = Infinity;
-      for (let i = 0; i < path.length; i++) {
-        const d = Math.hypot(path[i][0] - t.lat, path[i][1] - t.lng);
-        if (d < closestDist) { closestDist = d; closestIdx = i; }
-      }
-
       return {
         route,
-        realLat:  t.lat,
-        realLng:  t.lng,
-        // Interpolation state — train animates from current pos toward next stop
-        animLat:  t.lat,
-        animLng:  t.lng,
-        pathIdx:  Math.min(closestIdx + 1, path.length - 1), // target next stop
-        speed:    0.00008 + Math.random() * 0.00005,         // gentle movement
-        status:   t.status === 'AT_STOP' ? 'STOP' : 'MOVE',
-        stopMs:   0,
-        phase:    Math.random() * Math.PI * 2,
-        real:     true,
+        realLat: t.lat,
+        realLng: t.lng,
+        status:  t.status === 'AT_STOP' ? 'STOP' : 'MOVE',
+        stopMs:  0,
+        phase:   Math.random() * Math.PI * 2,
+        real:    true,
       };
     });
 
@@ -781,7 +766,7 @@ async function fetchRealTrains() {
       syncCount();
     }
   } catch (e) {
-    console.warn('Worker fetch failed, staying on simulation:', e.message);
+    console.warn('Worker fetch failed:', e.message);
   }
 }
 
@@ -790,9 +775,9 @@ function syncCount() {
   document.getElementById('trainCountInline').textContent = trains.length;
 }
 
-// Returns [lat, lng] — animated position for real trains, interpolated for simulated
+// Returns [lat, lng] — real reported position or simulated interpolation
 function trainLatLng(tr) {
-  if (tr.real) return [tr.animLat, tr.animLng];
+  if (tr.real) return [tr.realLat, tr.realLng];
   const path = tr.route.path;
   if (!path || path.length < 2) return [0, 0];
   const pos = tr.t * (path.length - 1);
@@ -805,36 +790,16 @@ function trainLatLng(tr) {
 function stepTrains(dt) {
   trains.forEach(tr => {
     tr.phase += 0.05;
-
     if (tr.real) {
-      // Gently animate real trains toward their next stop on the route
-      // Resets every 20s when fresh data arrives from the worker
+      // Real trains: pulse animation only, position locked to API data
+      // Position updates every 20s when fetchRealTrains() runs
       if (tr.status === 'STOP') {
         tr.stopMs += dt;
-        if (tr.stopMs > 2500) { tr.status = 'MOVE'; tr.stopMs = 0; }
-        return;
-      }
-      const path = tr.route.path;
-      if (!path || path.length < 2 || tr.pathIdx >= path.length) return;
-      const target = path[tr.pathIdx];
-      const dLat   = target[0] - tr.animLat;
-      const dLng   = target[1] - tr.animLng;
-      const dist   = Math.hypot(dLat, dLng);
-      if (dist < 0.0002) {
-        // Reached this stop — pause then advance to next
-        tr.pathIdx = Math.min(tr.pathIdx + 1, path.length - 1);
-        tr.status  = 'STOP';
-        tr.stopMs  = 0;
-      } else {
-        // Move toward target
-        const step = tr.speed * (dt / 16);
-        tr.animLat += (dLat / dist) * step;
-        tr.animLng += (dLng / dist) * step;
+        if (tr.stopMs > 3000) { tr.status = 'MOVE'; tr.stopMs = 0; }
       }
       return;
     }
-
-    // Simulated train movement
+    // Simulated trains
     if (tr.status === 'STOP') {
       tr.stopMs += dt;
       if (tr.stopMs > 2000 + Math.random() * 1000) { tr.status = 'MOVE'; tr.stopMs = 0; }
