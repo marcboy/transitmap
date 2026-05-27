@@ -629,15 +629,15 @@ function spawnTrains() {
 // Fetch real trains from worker and merge into simulation format
 async function fetchRealTrains() {
   if (!WORKER_URL) return;
-  if (cityId !== 'nyc' && cityId !== 'seattle') return;
+  if (cityId !== 'nyc' && cityId !== 'seattle' && cityId !== 'paris') return;
 
   try {
     const resp = await fetch(`${WORKER_URL}/trains/${cityId}`);
     if (!resp.ok) throw new Error(`Worker ${resp.status}`);
     const data = await resp.json();
 
-    const city   = CITIES[cityId];
-    const agency = cityId === 'nyc' ? 'MTA' : 'Sound Transit';
+    const city = CITIES[cityId];
+    const agency = cityId === 'nyc' ? 'MTA' : cityId === 'paris' ? 'RATP' : 'Sound Transit';
 
     // Build a lookup of existing train positions for smooth lerp
     const prevPos = {};
@@ -744,7 +744,7 @@ function startRealDataPolling() {
   fetchRealTrains();
   // Poll every 15s — MTA feed updates every 30s, this catches it fast
   setInterval(() => {
-    if (cityId === 'nyc' || cityId === 'seattle') fetchRealTrains();
+    if (cityId === 'nyc' || cityId === 'seattle' || cityId === 'paris') fetchRealTrains();
   }, 15000);
 }
 
@@ -832,7 +832,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v2.0', LAST_EDIT='2026-05-27 04:31 UTC'; // updated on every push
+const VERSION='v2.1', LAST_EDIT='2026-05-27 04:34 UTC'; // updated on every push
 function tick() {
   const n=new Date();
   const hh=String(n.getHours()).padStart(2,'0');
