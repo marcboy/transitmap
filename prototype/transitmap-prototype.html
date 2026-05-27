@@ -769,14 +769,19 @@ function spawnTrains() {
 
 // Fetch real trains from worker and merge into simulation format
 async function fetchRealTrains() {
-  if (!WORKER_URL || cityId !== 'nyc') return;
+  if (!WORKER_URL) return;
+  if (cityId !== 'nyc' && cityId !== 'seattle') return;
+
   try {
-    const resp = await fetch(`${WORKER_URL}/trains/nyc`);
+    const resp = await fetch(`${WORKER_URL}/trains/${cityId}`);
     if (!resp.ok) throw new Error(`Worker ${resp.status}`);
     const data = await resp.json();
 
+    const city   = CITIES[cityId];
+    const agency = cityId === 'nyc' ? 'MTA' : 'Sound Transit';
+
     const realTrains = data.trains.map(t => {
-      const route = CITIES.nyc.routes.find(r => r.id === t.line)
+      const route = city.routes.find(r => r.id === t.line)
                  ?? { id: t.line, color: t.color, path: [] };
       return {
         route,
@@ -792,7 +797,7 @@ async function fetchRealTrains() {
     if (realTrains.length > 0) {
       trains = realTrains;
       isLive = true;
-      document.getElementById('statusLabel').textContent = `Live · ${data.count} trains · MTA · 15s`;
+      document.getElementById('statusLabel').textContent = `Live · ${data.count} trains · ${agency} · 15s`;
       syncCount();
     }
   } catch (e) {
@@ -846,7 +851,9 @@ function startRealDataPolling() {
   if (!WORKER_URL) return;
   fetchRealTrains();
   // Poll every 15s — MTA feed updates every 30s, this catches it fast
-  setInterval(() => { if (cityId === 'nyc') fetchRealTrains(); }, 15000);
+  setInterval(() => {
+    if (cityId === 'nyc' || cityId === 'seattle') fetchRealTrains();
+  }, 15000);
 }
 
 function drawTrains() {
@@ -933,7 +940,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v1.5', LAST_EDIT='2026-05-27 04:05 UTC'; // updated on every push
+const VERSION='v1.6', LAST_EDIT='2026-05-27 04:11 UTC'; // updated on every push
 function tick() {
   const n=new Date();
   const hh=String(n.getHours()).padStart(2,'0');
