@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** Root fix: Leaflet constructed inside window.load — map tiles now always render
+> **Last change:** Replaced Leaflet with pure canvas tile engine — map tiles now guaranteed to render
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
@@ -208,6 +208,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | Replaced Leaflet entirely with custom canvas tile engine (no init-sizing dependency) |
 | 2026-05-26 | Root fix: L.map() moved inside window.load — tiles were never loading before |
 | 2026-05-26 | Tokyo: all 13 subway lines (Tokyo Metro + Toei) |
 | 2026-05-26 | Version stamp + edit time shown next to clock |
