@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** UI text brightness increased — muted opacity 0.35→0.72, all grey text brightened
+> **Last change:** Real MTA data wired up — worker + prototype ready, needs API key + deploy
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
@@ -208,6 +208,7 @@ Open `prototype/transitmap-prototype.html` in any browser.
 
 | Date | Change |
 |---|---|
+| 2026-05-26 | Real MTA data: worker rewritten as single file, prototype polls worker every 20s |
 | 2026-05-26 | UI readability: muted text opacity raised across all elements |
 | 2026-05-26 | Map fix: reverted to Leaflet, applied 200ms invalidateSize pattern (credit: Gemini) |
 | 2026-05-26 | Replaced Leaflet entirely with custom canvas tile engine (no init-sizing dependency) |
