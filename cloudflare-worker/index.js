@@ -143,7 +143,30 @@ const STOPS = {
   'R44':[40.6213,-73.9285],'R45':[40.6082,-73.9225],
 };
 
-// Sound Transit Link Light Rail via OneBusAway
+// IDFM Paris Métro via PRIM API
+// Free API key: https://prim.iledefrance-mobilites.fr → create account → get key
+// Set secret: wrangler secret put IDFM_API_KEY
+const IDFM_FEED = 'https://prim.iledefrance-mobilites.fr/marketplace/gtfs-rt/vehiclePositions';
+
+// IDFM route_id → line name + color
+const PARIS_LINES = {
+  'IDFM:C01371': { name:'1',   color:'#FFCD00' },
+  'IDFM:C01372': { name:'2',   color:'#003CA6' },
+  'IDFM:C01373': { name:'3',   color:'#9F7740' },
+  'IDFM:C01374': { name:'3b',  color:'#76D0F2' },
+  'IDFM:C01375': { name:'4',   color:'#CF009E' },
+  'IDFM:C01376': { name:'5',   color:'#FF7E2E' },
+  'IDFM:C01377': { name:'6',   color:'#6ECA97' },
+  'IDFM:C01378': { name:'7',   color:'#FA9ABA' },
+  'IDFM:C01379': { name:'7b',  color:'#6ECA97' },
+  'IDFM:C01380': { name:'8',   color:'#E19BDF' },
+  'IDFM:C01381': { name:'9',   color:'#B6BD00' },
+  'IDFM:C01382': { name:'10',  color:'#C9910D' },
+  'IDFM:C01383': { name:'11',  color:'#704B1C' },
+  'IDFM:C01384': { name:'12',  color:'#007852' },
+  'IDFM:C01385': { name:'13',  color:'#76D0F2' },
+  'IDFM:C01386': { name:'14',  color:'#62259D' },
+};
 // Agency 40 = Sound Transit (1 Line, 2 Line, T Line)
 // API key stored as secret: wrangler secret put OBA_API_KEY
 const OBA_FEED = 'https://api.pugetsound.onebusaway.org/api/gtfs_realtime/vehicle-positions-for-agency/40.pb';
@@ -172,6 +195,17 @@ export default {
       }
     }
 
+    if (path === '/trains/paris') {
+      const key = env.IDFM_API_KEY;
+      if (!key) return json({ error: 'IDFM_API_KEY secret not set — get free key at prim.iledefrance-mobilites.fr' }, 500);
+      try {
+        const trains = await fetchParisTrains(key);
+        return json({ city:'paris', count:trains.length, updatedAt:new Date().toISOString(), trains });
+      } catch (e) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
     if (path === '/trains/seattle') {
       const key = env.OBA_API_KEY;
       if (!key) return json({ error: 'OBA_API_KEY secret not set — run: wrangler secret put OBA_API_KEY' }, 500);
@@ -186,6 +220,50 @@ export default {
     return json({ error:'Not found. Try /trains/nyc, /trains/seattle, or /health' }, 404);
   }
 };
+
+// ── Paris — IDFM/RATP via PRIM API ───────────────────────────
+// PRIM publishes a true vehicle positions feed with real GPS coords
+
+async function fetchParisTrains(apiKey) {
+  const resp = await withTimeout(
+    fetch(IDFM_FEED, {
+      headers: { 'apikey': apiKey },
+      cf: { cacheTtl: 15, cacheEverything: true },
+    }), 8000
+  );
+  if (!resp.ok) throw new Error(`IDFM feed ${resp.status}`);
+
+  const bytes    = new Uint8Array(await resp.arrayBuffer());
+  const entities = decodeFeed(bytes);
+  const trains   = [];
+  const now      = Math.floor(Date.now() / 1000);
+
+  for (const entity of entities) {
+    const v = entity.vehicle;
+    if (!v?.position) continue;
+
+    const routeId = v.trip?.routeId ?? '';
+    const line    = PARIS_LINES[routeId];
+    if (!line) continue;  // skip non-metro routes (buses, trams, RER)
+
+    const stale = now - (v.timestamp ?? now);
+    if (stale > 180) continue;
+
+    trains.push({
+      id:      entity.id,
+      line:    line.name,
+      color:   line.color,
+      lat:     Math.round(v.position.latitude  * 100000) / 100000,
+      lng:     Math.round(v.position.longitude * 100000) / 100000,
+      bearing: v.position.bearing ? Math.round(v.position.bearing) : null,
+      status:  ['INCOMING','AT_STOP','IN_TRANSIT'][v.currentStatus] ?? 'IN_TRANSIT',
+      source:  'gps',
+      stale,
+    });
+  }
+
+  return trains;
+}
 
 // ── Seattle — Sound Transit via OneBusAway ────────────────────
 // OBA publishes a true vehicle positions feed with real GPS coords
