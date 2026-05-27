@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-27  
-> **Prototype version:** v2.8  
+> **Prototype version:** v2.9  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -259,6 +259,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-27 | v2.9 | Fix: LAST_EDIT timestamp was showing 17:30 PT (future); corrected to 11:20 PT |
 | 2026-05-27 | v2.8 | Shinkansen timetable engine: 9 service types, clock-driven positions, no API key needed |
 | 2026-05-27 | v2.7 | Fix GitHub Pages stale cache: no-cache meta tags + ?v= query string in index.html redirect |
 | 2026-05-27 | v2.6 | Version stamp now shows time in Pacific Time (e.g. "v2.6 · built 2026-05-27 · 16:45 PT") |
