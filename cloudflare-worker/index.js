@@ -161,50 +161,8 @@ export default {
       }
     }
 
-    // Deep debug — show exact nested structure of first 5 entities
-    if (path === '/debug') {
-      const resp = await fetch(MTA_FEEDS[0], { cf:{ cacheTtl:20 } });
-      const bytes = new Uint8Array(await resp.arrayBuffer());
 
-      function dumpMsg(bytes, depth) {
-        const r = new PB(bytes);
-        const out = {};
-        while (r.ok()) {
-          try {
-            const {f,w} = r.tag();
-            if (w===2) {
-              const sub = r.bytes();
-              if (depth < 3) {
-                // Try to decode as string first
-                try {
-                  const s = new TextDecoder('utf-8', {fatal:true}).decode(sub);
-                  if (s.length < 100 && /^[\x20-\x7e]*$/.test(s)) { out[f] = s; continue; }
-                } catch(e) {}
-                out[f] = dumpMsg(sub, depth+1);
-              } else {
-                out[f] = `bytes(${sub.length})`;
-              }
-            } else if (w===0) { out[f] = r.varint(); }
-            else if (w===5) { out[f] = r.float().toFixed(6); }
-            else if (w===1) { r.p+=8; out[f]='64bit'; }
-            else { out[f]='unk'; }
-          } catch(e) { break; }
-        }
-        return out;
-      }
-
-      // Parse feed top-level, grab first 5 field-2 entities
-      const r = new PB(bytes);
-      const entities = [];
-      while (r.ok() && entities.length < 5) {
-        const {f,w} = r.tag();
-        if (f===2&&w===2) entities.push(dumpMsg(r.bytes(), 0));
-        else r.skip(w);
-      }
-      return json({ bytes: bytes.length, entities });
-    }
-
-    return json({ error:'Not found. Try /trains/nyc, /health, or /debug' }, 404);
+    return json({ error:'Not found. Try /trains/nyc or /health' }, 404);
   }
 };
 
@@ -287,45 +245,6 @@ async function fetchFeed(url) {
   return decodeFeed(new Uint8Array(await resp.arrayBuffer()));
 }
 
-// Raw decoder — dumps all field numbers without assuming structure
-function decodeFeedRaw(bytes) {
-  const r = new PB(bytes), entities = [];
-  while (r.ok()) {
-    const {f,w} = r.tag();
-    if (f===2&&w===2) {
-      const eb = r.bytes();
-      const er = new PB(eb);
-      const entity = { fields: {} };
-      while (er.ok()) {
-        const {f:ef,w:ew} = er.tag();
-        if (ew===2) {
-          const sub = er.bytes();
-          const sr  = new PB(sub);
-          const subFields = {};
-          while (sr.ok()) {
-            try {
-              const {f:sf,w:sw} = sr.tag();
-              if (sw===2) { const s2=sr.bytes(); subFields[sf]='bytes('+s2.length+')'; }
-              else if (sw===0) { subFields[sf]=sr.varint(); }
-              else if (sw===5) { subFields[sf]=sr.float(); }
-              else { sr.skip(sw); subFields[sf]='wire'+sw; }
-            } catch(e) { break; }
-          }
-          entity.fields[ef] = subFields;
-        } else if (ew===0) {
-          entity.fields[ef] = er.varint();
-        } else if (ew===2) {
-          er.bytes();
-          entity.fields[ef] = 'bytes';
-        } else {
-          er.skip(ew);
-        }
-      }
-      entities.push(entity);
-    } else r.skip(w);
-  }
-  return entities;
-}
 
 // ── GTFS-RT protobuf decoder — trip update focused ───────────
 
