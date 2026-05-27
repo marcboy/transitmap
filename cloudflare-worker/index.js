@@ -161,15 +161,47 @@ export default {
       }
     }
 
-    // Fast debug — decode ONE feed only, show raw entity structure
+    // Deep debug — show exact nested structure of first 5 entities
     if (path === '/debug') {
-      const url = MTA_FEEDS[0]; // just the 1/2/3/4/5/6/7 feed
-      const resp = await fetch(url, { cf:{ cacheTtl:20 } });
-      const buf  = await resp.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      // Show the first 3 raw entities with ALL fields visible
-      const entities = decodeFeedRaw(bytes).slice(0, 3);
-      return json({ bytes: buf.byteLength, entities });
+      const resp = await fetch(MTA_FEEDS[0], { cf:{ cacheTtl:20 } });
+      const bytes = new Uint8Array(await resp.arrayBuffer());
+
+      function dumpMsg(bytes, depth) {
+        const r = new PB(bytes);
+        const out = {};
+        while (r.ok()) {
+          try {
+            const {f,w} = r.tag();
+            if (w===2) {
+              const sub = r.bytes();
+              if (depth < 3) {
+                // Try to decode as string first
+                try {
+                  const s = new TextDecoder('utf-8', {fatal:true}).decode(sub);
+                  if (s.length < 100 && /^[\x20-\x7e]*$/.test(s)) { out[f] = s; continue; }
+                } catch(e) {}
+                out[f] = dumpMsg(sub, depth+1);
+              } else {
+                out[f] = `bytes(${sub.length})`;
+              }
+            } else if (w===0) { out[f] = r.varint(); }
+            else if (w===5) { out[f] = r.float().toFixed(6); }
+            else if (w===1) { r.p+=8; out[f]='64bit'; }
+            else { out[f]='unk'; }
+          } catch(e) { break; }
+        }
+        return out;
+      }
+
+      // Parse feed top-level, grab first 5 field-2 entities
+      const r = new PB(bytes);
+      const entities = [];
+      while (r.ok() && entities.length < 5) {
+        const {f,w} = r.tag();
+        if (f===2&&w===2) entities.push(dumpMsg(r.bytes(), 0));
+        else r.skip(w);
+      }
+      return json({ bytes: bytes.length, entities });
     }
 
     return json({ error:'Not found. Try /trains/nyc, /health, or /debug' }, 404);
