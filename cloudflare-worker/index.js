@@ -46,6 +46,24 @@ export default {
       return json({ status: 'ok', ts: new Date().toISOString() });
     }
 
+    // Debug endpoint — shows raw feed status without full decode
+    if (path === '/debug') {
+      const results = await Promise.allSettled(
+        MTA_FEEDS.map(async url => {
+          const resp = await fetch(url, { cf: { cacheTtl: 20 } });
+          const buf  = await resp.arrayBuffer();
+          return {
+            url:    url.split('%2F').pop(),
+            status: resp.status,
+            bytes:  buf.byteLength,
+            // peek first 4 bytes to verify protobuf magic
+            header: Array.from(new Uint8Array(buf.slice(0,4))).map(b=>b.toString(16)).join(' '),
+          };
+        })
+      );
+      return json(results.map(r => r.status === 'fulfilled' ? r.value : { error: r.reason?.message }));
+    }
+
     if (path === '/trains/nyc') {
       try {
         const trains = await fetchAllMTATrains(ctx);
