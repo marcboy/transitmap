@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-26  
-> **Last change:** 2026-05-27 03:55 UTC — version stamp shows exact build time as debug tool
+> **Last change:** 2026-05-27 04:02 UTC — local date/time added top-left under Live Transit
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/
 
