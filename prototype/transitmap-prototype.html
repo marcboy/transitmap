@@ -124,6 +124,7 @@ const CITIES = {
     name:   'New York City',
     center: [40.740, -73.980],
     zoom:   12,
+    timezone: 'America/New_York',
     lines: [
       { id:'1',  name:'1',  color:'#EE352E' },
       { id:'2',  name:'2',  color:'#EE352E' },
@@ -132,9 +133,9 @@ const CITIES = {
       { id:'5',  name:'5',  color:'#00933C' },
       { id:'6',  name:'6',  color:'#00933C' },
       { id:'7',  name:'7',  color:'#B933AD' },
-      { id:'A',  name:'A',  color:'#2850AD' },
-      { id:'C',  name:'C',  color:'#2850AD' },
-      { id:'E',  name:'E',  color:'#2850AD' },
+      { id:'A',  name:'A',  color:'#1657A8' },
+      { id:'C',  name:'C',  color:'#4A90D9' },
+      { id:'E',  name:'E',  color:'#7BB8E8' },
       { id:'B',  name:'B',  color:'#FF6319' },
       { id:'D',  name:'D',  color:'#FF6319' },
       { id:'F',  name:'F',  color:'#FF6319' },
@@ -207,7 +208,7 @@ const CITIES = {
         [40.7487,-73.8301],[40.7503,-73.8186],[40.7498,-73.8058]
       ]},
       // A — Blue — 8th Ave + Far Rockaway branch + Rockaway Park branch
-      { id:'A', color:'#2850AD', path:[
+      { id:'A', color:'#1657A8', path:[
         [40.8880,-73.9325],[40.8686,-73.9153],[40.8561,-73.9321],
         [40.8367,-73.9402],[40.8250,-73.9502],[40.8122,-73.9431],
         [40.7984,-73.9514],[40.7901,-73.9714],[40.7833,-73.9817],
@@ -225,7 +226,7 @@ const CITIES = {
         [40.6106,-73.8151],[40.6258,-73.8185],[40.7611,-73.8307]
       ]},
       // C — Blue — 8th Ave local
-      { id:'C', color:'#2850AD', path:[
+      { id:'C', color:'#4A90D9', path:[
         [40.8122,-73.9431],[40.7984,-73.9514],[40.7901,-73.9714],
         [40.7833,-73.9817],[40.7768,-73.9891],[40.7681,-74.0004],
         [40.7505,-74.0002],[40.7438,-74.0079],[40.7176,-74.0124],
@@ -233,7 +234,7 @@ const CITIES = {
         [40.6450,-73.9818],[40.6288,-73.9624],[40.5978,-73.9624]
       ]},
       // E — Blue — Queens trunk
-      { id:'E', color:'#2850AD', path:[
+      { id:'E', color:'#7BB8E8', path:[
         [40.7505,-74.0002],[40.7469,-73.9887],[40.7460,-73.9773],
         [40.7447,-73.9630],[40.7447,-73.9497],[40.7453,-73.9364],
         [40.7447,-73.9228],[40.7443,-73.9108],[40.7357,-73.8966],
@@ -323,6 +324,7 @@ const CITIES = {
     name:   'Paris',
     center: [48.857, 2.347],
     zoom:   13,
+    timezone: 'Europe/Paris',
     lines: [
       { id:'1',    name:'M1',   color:'#FFCD00' },
       { id:'2',    name:'M2',   color:'#003CA6' },
@@ -497,6 +499,7 @@ const CITIES = {
     name:   'Seattle',
     center: [47.620, -122.250],
     zoom:   11,
+    timezone: 'America/Los_Angeles',
     lines: [
       { id:'1-Line', name:'1 Line', color:'#E31837' }, // Red
       { id:'2-Line', name:'2 Line', color:'#0091DA' }, // Blue
@@ -553,6 +556,7 @@ const CITIES = {
     name:   'Tokyo',
     center: [35.6812, 139.7671],
     zoom:   13,
+    timezone: 'Asia/Tokyo',
     lines: [
       // Tokyo Metro (9 lines)
       { id:'G',  name:'Ginza',      color:'#FF9500' },
@@ -929,15 +933,16 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v1.4', LAST_EDIT='2026-05-27 04:01 UTC'; // updated on every push
+const VERSION='v1.5', LAST_EDIT='2026-05-27 04:05 UTC'; // updated on every push
 function tick() {
   const n=new Date();
   const hh=String(n.getHours()).padStart(2,'0');
   const mm=String(n.getMinutes()).padStart(2,'0');
   const ss=String(n.getSeconds()).padStart(2,'0');
   document.getElementById('versionStamp').textContent=`${VERSION} · built ${LAST_EDIT}`;
-  const localStr = n.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' })
-    + ' · ' + n.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const tz = CITIES[cityId]?.timezone ?? 'UTC';
+  const localStr = n.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric', timeZone: tz })
+    + ' · ' + n.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone: tz });
   document.getElementById('localTime').textContent = localStr;
 }
 
