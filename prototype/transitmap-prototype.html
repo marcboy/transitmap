@@ -639,13 +639,27 @@ async function fetchRealTrains() {
     const city   = CITIES[cityId];
     const agency = cityId === 'nyc' ? 'MTA' : 'Sound Transit';
 
+    // Build a lookup of existing train positions for smooth lerp
+    const prevPos = {};
+    trains.forEach(tr => {
+      if (tr.real && tr.id) prevPos[tr.id] = { lat: tr.animLat ?? tr.realLat, lng: tr.animLng ?? tr.realLng };
+    });
+
     const realTrains = data.trains.map(t => {
       const route = city.routes.find(r => r.id === t.line)
                  ?? { id: t.line, color: t.color, path: [] };
+      const prev = prevPos[t.id];
       return {
+        id:      t.id,
         route,
         realLat: t.lat,
         realLng: t.lng,
+        // Lerp from previous known position to new one
+        prevLat: prev ? prev.lat : t.lat,
+        prevLng: prev ? prev.lng : t.lng,
+        animLat: prev ? prev.lat : t.lat,
+        animLng: prev ? prev.lng : t.lng,
+        lerpT:   prev ? 0 : 1,  // start lerp from 0 if we have a previous position
         status:  t.status === 'AT_STOP' ? 'STOP' : 'MOVE',
         stopMs:  0,
         phase:   Math.random() * Math.PI * 2,
@@ -679,7 +693,7 @@ function syncCount() {
 
 // Returns [lat, lng] — real reported position or simulated interpolation
 function trainLatLng(tr) {
-  if (tr.real) return [tr.realLat, tr.realLng];
+  if (tr.real) return [tr.animLat ?? tr.realLat, tr.animLng ?? tr.realLng];
   const path = tr.route.path;
   if (!path || path.length < 2) return [0, 0];
   const pos = tr.t * (path.length - 1);
@@ -692,15 +706,26 @@ function trainLatLng(tr) {
 function stepTrains(dt) {
   trains.forEach(tr => {
     tr.phase += 0.05;
+
     if (tr.real) {
-      // Real trains: pulse animation only, position locked to API data
-      // Position updates every 20s when fetchRealTrains() runs
+      // Smoothly lerp from last position to current reported position
+      // This gives fluid motion as trains move between 15s API updates
+      if (tr.prevLat !== undefined && tr.lerpT < 1) {
+        tr.lerpT = Math.min(1, tr.lerpT + dt / 15000); // complete over 15s
+        tr.animLat = tr.prevLat + (tr.realLat - tr.prevLat) * tr.lerpT;
+        tr.animLng = tr.prevLng + (tr.realLng - tr.prevLng) * tr.lerpT;
+      } else {
+        tr.animLat = tr.realLat;
+        tr.animLng = tr.realLng;
+      }
+
       if (tr.status === 'STOP') {
         tr.stopMs += dt;
         if (tr.stopMs > 3000) { tr.status = 'MOVE'; tr.stopMs = 0; }
       }
       return;
     }
+
     // Simulated trains
     if (tr.status === 'STOP') {
       tr.stopMs += dt;
@@ -807,7 +832,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v1.9', LAST_EDIT='2026-05-27 04:27 UTC'; // updated on every push
+const VERSION='v2.0', LAST_EDIT='2026-05-27 04:31 UTC'; // updated on every push
 function tick() {
   const n=new Date();
   const hh=String(n.getHours()).padStart(2,'0');
