@@ -240,7 +240,7 @@ function withTimeout(p, ms) {
 }
 
 async function fetchFeed(url) {
-  const resp = await fetch(url, { cf:{ cacheTtl:20, cacheEverything:true } });
+  const resp = await fetch(url, { cf:{ cacheTtl:15, cacheEverything:true } });
   if (!resp.ok) throw new Error(`${resp.status}`);
   return decodeFeed(new Uint8Array(await resp.arrayBuffer()));
 }
