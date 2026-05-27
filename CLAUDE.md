@@ -9,6 +9,7 @@ After **every** code edit (prototype, worker, Swift app, or any other file), upd
 - Add a row to the **Change Log** table: `| YYYY-MM-DD | vX.X | one-line description |`
 - Update **Last updated** date in the header
 - If a bug is fixed, add a note explaining what was broken and what fixed it
+- When bumping the prototype version, also update `LAST_EDIT` in the prototype JS to the current date + Pacific Time (PT), format: `'YYYY-MM-DD · HH:MM PT'`
 
 This applies to every single commit, no exceptions.
 
