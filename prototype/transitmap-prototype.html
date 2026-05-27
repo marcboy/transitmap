@@ -638,6 +638,166 @@ const CITIES = {
     ],
   };
 
+// ── Shinkansen Timetable Engine ──────────────────────────────
+// Trains are positioned from official schedules + current JST clock.
+// No API key needed. Works for all lines including Tokaido (no public RT API).
+// Shinkansen average delay is ~36 seconds, so timetable = ground truth.
+//
+// Each service definition: stops are [lat, lng, minutesFromDeparture]
+// addService() auto-generates both directions.
+
+const SHIN_SERVICES = [];
+
+function addService(lineId, color, stops, firstDep, lastDep, interval) {
+  SHIN_SERVICES.push({ lineId, color, stops, firstDep, lastDep, interval });
+  // Reverse direction: reverse stop order, recalculate times from zero
+  const dur = stops[stops.length - 1][2];
+  const rev = stops.slice().reverse().map(([la, ln, t]) => [la, ln, dur - t]);
+  SHIN_SERVICES.push({ lineId, color, stops: rev, firstDep, lastDep, interval });
+}
+
+// ── Tokaido-Sanyo Nozomi (fastest): Tokyo ↔ Hakata ~4h38m
+addService('T', '#003087', [
+  [35.6812,139.7671,  0],   // Tokyo
+  [35.4663,139.6201, 14],   // Shin-Yokohama
+  [35.1709,136.8815, 86],   // Nagoya
+  [34.9854,135.7588,130],   // Kyoto
+  [34.7330,135.5003,137],   // Shin-Osaka
+  [34.6572,133.9168,186],   // Okayama
+  [34.3964,132.4597,220],   // Hiroshima
+  [33.8840,130.8751,268],   // Kokura
+  [33.5899,130.4219,278],   // Hakata
+], 6*60, 23*60, 10);
+
+// ── Tokaido-Sanyo Hikari (express, more stops): Tokyo ↔ Hakata ~5h20m
+addService('T', '#0055CC', [
+  [35.6812,139.7671,  0],   // Tokyo
+  [35.4663,139.6201, 18],   // Shin-Yokohama
+  [35.1709,136.8815, 97],   // Nagoya
+  [34.9854,135.7588,148],   // Kyoto
+  [34.7330,135.5003,155],   // Shin-Osaka
+  [34.6921,135.1975,165],   // Shin-Kobe
+  [34.8258,134.6867,182],   // Himeji
+  [34.6572,133.9168,210],   // Okayama
+  [34.3964,132.4597,249],   // Hiroshima
+  [33.8840,130.8751,305],   // Kokura
+  [33.5899,130.4219,320],   // Hakata
+], 6*60, 23*60, 20);
+
+// ── Tohoku Hayabusa (fastest): Tokyo ↔ Shin-Aomori ~3h5m
+addService('N', '#007B40', [
+  [35.6812,139.7671,  0],   // Tokyo
+  [35.9072,139.6244, 25],   // Omiya
+  [38.2597,140.8826, 92],   // Sendai
+  [39.7012,141.1339,130],   // Morioka
+  [40.7831,140.7143,185],   // Shin-Aomori
+], 6*60, 22*60, 30);
+
+// ── Tohoku Yamabiko (regional, more stops): Tokyo ↔ Morioka ~2h30m
+addService('N', '#009B50', [
+  [35.6812,139.7671,  0],   // Tokyo
+  [35.9072,139.6244, 25],   // Omiya
+  [37.3997,140.4679, 72],   // Koriyama
+  [37.7543,140.4681, 88],   // Fukushima
+  [38.2597,140.8826,110],   // Sendai
+  [39.7012,141.1339,150],   // Morioka
+], 6*60, 22*60, 30);
+
+// ── Joetsu Toki: Tokyo ↔ Niigata ~1h35m
+addService('J', '#F58220', [
+  [35.6812,139.7671,  0],   // Tokyo
+  [35.9072,139.6244, 25],   // Omiya
+  [36.9268,138.8115, 75],   // Echigo-Yuzawa
+  [37.4473,138.8478, 99],   // Nagaoka
+  [37.9161,139.0592,100],   // Niigata
+], 6*60, 22*60, 30);
+
+// ── Hokuriku Kagayaki (fastest): Tokyo ↔ Kanazawa ~2h28m
+addService('H', '#7B489B', [
+  [35.6812,139.7671,  0],   // Tokyo
+  [35.9072,139.6244, 25],   // Omiya
+  [36.6432,138.1882, 80],   // Nagano
+  [36.7066,137.2137,125],   // Toyama
+  [36.5781,136.6478,148],   // Kanazawa
+], 6*60, 22*60, 60);
+
+// ── Hokuriku Hakutaka (express): Tokyo ↔ Tsuruga ~3h10m
+addService('H', '#9B60BB', [
+  [35.6812,139.7671,  0],   // Tokyo
+  [35.9072,139.6244, 25],   // Omiya
+  [36.3224,139.0042, 50],   // Takasaki
+  [36.6432,138.1882, 93],   // Nagano
+  [36.7066,137.2137,140],   // Toyama
+  [36.5781,136.6478,163],   // Kanazawa
+  [36.0652,136.2196,186],   // Fukui
+  [35.6519,136.0817,190],   // Tsuruga
+], 6*60, 22*60, 60);
+
+// ── Kyushu Mizuho/Sakura: Hakata ↔ Kagoshima-Chuo ~1h18m
+addService('K', '#CE0E2D', [
+  [33.5899,130.4219,  0],   // Hakata
+  [32.7898,130.7417, 36],   // Kumamoto
+  [31.5872,130.5381, 79],   // Kagoshima-Chuo
+], 6*60, 22*60, 20);
+
+// ── Nishi-Kyushu Kamome: Hakata ↔ Nagasaki ~1h20m (incl. relay)
+addService('W', '#FF6B35', [
+  [33.5899,130.4219,  0],   // Hakata
+  [33.3502,130.2100, 30],   // Shin-Tosu area (relay)
+  [33.1262,130.0636, 50],   // Ureshino-Onsen
+  [32.9006,129.8590, 80],   // Nagasaki
+], 7*60, 21*60, 30);
+
+// Returns current JST minutes-since-midnight
+function jstNow() {
+  return ((Date.now() + 9 * 3600 * 1000) % 86400000) / 60000;
+}
+
+// Interpolate lat/lng along a stop sequence at `elapsed` minutes from departure
+function shinPos(stops, elapsed) {
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [la1, ln1, t1] = stops[i];
+    const [la2, ln2, t2] = stops[i + 1];
+    if (elapsed >= t1 && elapsed <= t2) {
+      const f = (elapsed - t1) / (t2 - t1);
+      return { lat: la1 + (la2 - la1) * f, lng: ln1 + (ln2 - ln1) * f };
+    }
+  }
+  return null;
+}
+
+// Compute all Shinkansen trains running right now
+function computeShinkansenTrains() {
+  const now = jstNow();
+  const result = [];
+  for (const svc of SHIN_SERVICES) {
+    const dur = svc.stops[svc.stops.length - 1][2];
+    for (let dep = svc.firstDep; dep <= svc.lastDep; dep += svc.interval) {
+      // elapsed minutes since this train departed (handle trains from previous calendar day)
+      let elapsed = now - dep;
+      if (elapsed < 0) elapsed += 1440; // yesterday's late departure still running
+      if (elapsed > dur) continue;       // already arrived
+      const pos = shinPos(svc.stops, elapsed);
+      if (!pos) continue;
+      // deterministic phase so dots don't all pulse in sync
+      const phase = ((dep * 31 + svc.lineId.charCodeAt(0) * 7) % 628) / 100;
+      result.push({
+        id:      `shin-${svc.lineId}-${dep}-${svc.stops[0][0].toFixed(1)}`,
+        route:   { id: svc.lineId, color: svc.color, path: [] },
+        real:    true,
+        realLat: pos.lat, realLng: pos.lng,
+        animLat: pos.lat, animLng: pos.lng,
+        prevLat: pos.lat, prevLng: pos.lng,
+        lerpT:   1,
+        status:  'MOVE',
+        stopMs:  0,
+        phase,
+      });
+    }
+  }
+  return result;
+}
+
 // ── STATE ────────────────────────────────────────────────────
 let cityId = 'nyc';
 let trains = [];
@@ -908,10 +1068,22 @@ function drawTrains() {
 
 // ── RENDER LOOP ───────────────────────────────────────────────
 let last = 0;
+let lastJapanUpdate = 0;
 function loop(ts) {
   const dt = Math.min(ts-last, 100);
   last = ts;
-  stepTrains(dt);
+  if (cityId === 'japan') {
+    // Refresh Shinkansen positions once per second (JST clock-driven)
+    if (ts - lastJapanUpdate > 1000) {
+      trains = computeShinkansenTrains();
+      syncCount();
+      lastJapanUpdate = ts;
+    }
+    // Gentle pulse phase
+    trains.forEach(tr => { tr.phase = (tr.phase + 0.002 * dt) % (Math.PI * 2); });
+  } else {
+    stepTrains(dt);
+  }
   drawTrains();
   requestAnimationFrame(loop);
 }
@@ -929,7 +1101,15 @@ function switchCity(id, btn) {
     // invalidateSize again after city switch in case container shifted
     setTimeout(() => { leafletMap.invalidateSize(); }, 200);
     drawRoutes();
-    spawnTrains();
+    if (id === 'japan') {
+      trains = computeShinkansenTrains();
+      syncCount();
+      lastJapanUpdate = 0; // force refresh on next loop tick
+      document.getElementById('statusLabel').textContent =
+        `Timetable · ${trains.length} trains · JR Group · JST`;
+    } else {
+      spawnTrains();
+    }
     renderLegend();
     document.querySelectorAll('.city-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
@@ -945,7 +1125,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v2.6', LAST_EDIT='2026-05-27 · 16:45 PT'; // updated on every push
+const VERSION='v2.8', LAST_EDIT='2026-05-27 · 17:30 PT'; // updated on every push
 function tick() {
   const n=new Date();
   const hh=String(n.getHours()).padStart(2,'0');
