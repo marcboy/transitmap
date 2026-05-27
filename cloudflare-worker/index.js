@@ -344,23 +344,12 @@ function decodeEntity(bytes) {
   const e = { id:'', tripUpdate:null, vehicle:null };
   while (r.ok()) {
     const {f,w} = r.tag();
-    if      (f===1&&w===2) e.id         = readEntityId(r.bytes()); // id is nested
+    if      (f===1&&w===2) e.id         = r.str();       // plain string
     else if (f===3&&w===2) e.tripUpdate = decodeTripUpdate(r.bytes());
-    else if (f===4&&w===2) e.vehicle    = decodeVehicle(r.bytes()); // vehicle position
+    else if (f===4&&w===2) e.vehicle    = decodeVehicle(r.bytes());
     else r.skip(w);
   }
   return e;
-}
-
-// The id field is itself a message with field 6 = the string bytes
-function readEntityId(bytes) {
-  const r = new PB(bytes);
-  while (r.ok()) {
-    const {f,w} = r.tag();
-    if (f===6&&w===2) return r.str();
-    else r.skip(w);
-  }
-  return '';
 }
 
 function decodeTripUpdate(bytes) {
@@ -378,21 +367,18 @@ function decodeTrip(bytes) {
   const r = new PB(bytes), t = {tripId:'',routeId:''};
   while (r.ok()) {
     const {f,w} = r.tag();
-    if      (f===1&&w===2) t.tripId  = r.str();
-    else if (f===3&&w===2) t.routeId = r.str();
+    if      (f===1&&w===2) t.tripId  = r.str();  // field 1 = trip_id
+    else if (f===5&&w===2) t.routeId = r.str();  // field 5 = route_id (NYCT uses field 5!)
     else r.skip(w);
   }
   return t;
 }
 
 function decodeStopTimeUpdate(bytes) {
-  const r = new PB(bytes), s = {stopId:null, arrival:null, departure:null};
+  const r = new PB(bytes), s = {stopId:null};
   while (r.ok()) {
     const {f,w} = r.tag();
-    if      (f===3&&w===0) s.stopSequence = r.varint();
-    else if (f===4&&w===2) s.arrival      = decodeStopEvent(r.bytes());
-    else if (f===5&&w===2) s.departure    = decodeStopEvent(r.bytes());
-    else if (f===7&&w===2) s.stopId       = r.str();
+    if      (f===4&&w===2) s.stopId = r.str();  // field 4 = stop_id in NYCT feed
     else r.skip(w);
   }
   return s;
