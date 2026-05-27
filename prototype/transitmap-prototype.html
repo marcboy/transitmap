@@ -4,393 +4,111 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TransitMap — Ambient Prototype</title>
-
-<!-- Leaflet -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap');
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
     --bg: #080c14;
     --surface: rgba(255,255,255,0.04);
     --border: rgba(255,255,255,0.07);
-    --text: #e8edf5;
     --muted: rgba(255,255,255,0.35);
   }
+  html, body { width:100%; height:100%; background:var(--bg); color:#e8edf5; font-family:'DM Mono',monospace; overflow:hidden; user-select:none; }
 
-  html, body {
-    width: 100%; height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'DM Mono', monospace;
-    overflow: hidden;
-    user-select: none;
-  }
-
-  /* ── MAP ── */
   #map-wrap {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    position:absolute; top:0; left:0; width:100%; height:100%;
     transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
   }
+  #map-wrap.ad-active { width:50%; }
 
-  #leaflet-map {
-    width: 100%; height: 100%;
-    background: #080c14;
-  }
+  /* Single canvas renders everything: tiles + routes + trains */
+  #mainCanvas { position:absolute; top:0; left:0; display:block; }
 
-  /* Hide Leaflet attribution (keep it for production) */
-  .leaflet-control-attribution { display: none; }
-  .leaflet-control-zoom { display: none; }
-
-  /* Subtle tint — just enough to make train lines pop */
-  #map-tint {
-    position: absolute;
-    inset: 0;
-    background: rgba(4, 8, 18, 0.18);
-    pointer-events: none;
-    z-index: 399;
-  }
-
-  /* Train canvas sits above tiles and tint */
-  #train-canvas {
-    position: absolute;
-    top: 0; left: 0;
-    pointer-events: none;
-    z-index: 400;
-  }
-
-  /* ── TOP BAR ── */
+  /* TOP BAR */
   .topbar {
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    padding: 24px 32px;
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    background: linear-gradient(to bottom, rgba(8,12,20,0.92) 0%, transparent 100%);
-    pointer-events: none;
-    z-index: 500;
-    transition: right 0.6s cubic-bezier(0.4,0,0.2,1);
+    position:absolute; top:0; left:0; right:0;
+    padding:24px 32px;
+    display:flex; align-items:flex-start; justify-content:space-between;
+    background:linear-gradient(to bottom,rgba(8,12,20,0.9) 0%,transparent 100%);
+    pointer-events:none; z-index:500;
+    transition:right 0.6s cubic-bezier(0.4,0,0.2,1);
   }
-
-  .city-name {
-    font-family: 'Syne', sans-serif;
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    color: #fff;
-    line-height: 1;
-  }
-
-  .city-sub {
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 6px;
-  }
-
+  .city-name { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; color:#fff; line-height:1; }
+  .city-sub  { font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-top:6px; }
   .status-pill {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 7px 14px;
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 0.5px;
+    display:flex; align-items:center; gap:7px;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:20px; padding:7px 14px; font-size:11px; color:var(--muted);
   }
-
-  .pulse-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: #4ade80;
-    box-shadow: 0 0 8px #4ade80;
-    animation: blink 2s ease-in-out infinite;
-  }
-
+  .pulse-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 8px #4ade80; animation:blink 2s ease-in-out infinite; }
   @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-  /* ── CITY SWITCHER ── */
+  /* CITY SWITCHER */
   .city-switcher {
-    position: absolute;
-    top: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 6px;
-    z-index: 500;
-    background: rgba(8,12,20,0.85);
-    border: 1px solid var(--border);
-    border-radius: 30px;
-    padding: 5px;
-    backdrop-filter: blur(12px);
-    transition: left 0.6s cubic-bezier(0.4,0,0.2,1);
-    white-space: nowrap;
+    position:absolute; top:24px; left:50%; transform:translateX(-50%);
+    display:flex; gap:6px; z-index:500;
+    background:rgba(8,12,20,0.85); border:1px solid var(--border);
+    border-radius:30px; padding:5px; backdrop-filter:blur(12px);
+    white-space:nowrap;
+    transition:left 0.6s cubic-bezier(0.4,0,0.2,1);
   }
+  .ad-active-ui .city-switcher { left:25%; }
+  .city-btn { font-family:'DM Mono',monospace; font-size:12px; padding:7px 18px; border-radius:20px; border:none; cursor:pointer; color:var(--muted); background:transparent; transition:all 0.25s; }
+  .city-btn.active { background:rgba(255,255,255,0.12); color:#fff; }
+  .city-btn:hover:not(.active) { color:rgba(255,255,255,0.65); }
 
-  .city-btn {
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    padding: 7px 18px;
-    border-radius: 20px;
-    border: none;
-    cursor: pointer;
-    color: var(--muted);
-    background: transparent;
-    transition: all 0.25s;
-    letter-spacing: 0.3px;
-  }
-
-  .city-btn.active { background: rgba(255,255,255,0.12); color: #fff; }
-  .city-btn:hover:not(.active) { color: rgba(255,255,255,0.65); }
-
-  /* ── BOTTOM LEGEND ── */
+  /* LEGEND */
   .legend {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    padding: 28px 32px;
-    background: linear-gradient(to top, rgba(8,12,20,0.92) 0%, transparent 100%);
-    z-index: 500;
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    transition: right 0.6s cubic-bezier(0.4,0,0.2,1);
+    position:absolute; bottom:0; left:0; right:0;
+    padding:28px 32px;
+    background:linear-gradient(to top,rgba(8,12,20,0.9) 0%,transparent 100%);
+    z-index:500; display:flex; align-items:flex-end; justify-content:space-between;
+    transition:right 0.6s cubic-bezier(0.4,0,0.2,1);
   }
+  .ad-active-ui .topbar, .ad-active-ui .legend { right:50%; }
+  .lines-row { display:flex; flex-wrap:wrap; gap:5px; max-width:70%; }
+  .line-chip { display:flex; align-items:center; gap:5px; padding:4px 10px 4px 6px; border-radius:20px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); font-size:11px; color:rgba(255,255,255,0.7); }
+  .line-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .clock-time { font-family:'Syne',sans-serif; font-size:38px; font-weight:700; color:rgba(255,255,255,0.9); letter-spacing:-1px; line-height:1; text-align:right; }
+  .clock-date { font-size:11px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; margin-top:4px; text-align:right; }
+  .version-stamp { font-size:10px; color:rgba(255,255,255,0.2); letter-spacing:1px; margin-top:6px; text-align:right; }
+  .train-count { position:absolute; bottom:110px; right:32px; font-size:11px; color:var(--muted); letter-spacing:1px; text-align:right; z-index:500; text-transform:uppercase; transition:right 0.6s cubic-bezier(0.4,0,0.2,1); }
+  .ad-active-ui .train-count { right:calc(50% + 32px); }
+  .train-count span { font-family:'Syne',sans-serif; font-size:24px; font-weight:700; color:rgba(255,255,255,0.55); display:block; line-height:1; }
 
-  .lines-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    max-width: 70%;
-  }
-
-  .line-chip {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px 4px 6px;
-    border-radius: 20px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    font-size: 11px;
-    color: rgba(255,255,255,0.7);
-  }
-
-  .line-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
-  .clock-time {
-    font-family: 'Syne', sans-serif;
-    font-size: 38px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.9);
-    letter-spacing: -1px;
-    line-height: 1;
-    text-align: right;
-  }
-
-  .clock-date {
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    margin-top: 4px;
-    text-align: right;
-  }
-
-  .version-stamp {
-    font-size: 10px;
-    color: rgba(255,255,255,0.2);
-    letter-spacing: 1px;
-    margin-top: 6px;
-    text-align: right;
-    font-family: 'DM Mono', monospace;
-  }
-
-  .train-count {
-    position: absolute;
-    bottom: 110px; right: 32px;
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 1px;
-    text-align: right;
-    z-index: 500;
-    text-transform: uppercase;
-    transition: right 0.6s cubic-bezier(0.4,0,0.2,1);
-  }
-
-  .train-count span {
-    font-family: 'Syne', sans-serif;
-    font-size: 24px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.55);
-    display: block;
-    line-height: 1;
-  }
-
-  /* ── SPLIT-SCREEN AD ── */
-  #map-wrap.ad-active { width: 50%; }
-
-  .ad-active-ui .topbar,
-  .ad-active-ui .legend { right: 50%; }
-  .ad-active-ui .city-switcher { left: 25%; transform: translateX(-50%); }
-  .ad-active-ui .train-count   { right: calc(50% + 32px); }
-
+  /* AD PANEL */
   .ad-panel {
-    position: absolute;
-    top: 0; right: 0;
-    width: 50%; height: 100%;
-    background: #0d1120;
-    border-left: 1px solid rgba(255,255,255,0.08);
-    z-index: 600;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 48px 44px;
-    transform: translateX(100%);
-    transition: transform 0.6s cubic-bezier(0.4,0,0.2,1);
-    pointer-events: none;
+    position:absolute; top:0; right:0; width:50%; height:100%;
+    background:#0d1120; border-left:1px solid rgba(255,255,255,0.08);
+    z-index:600; display:flex; flex-direction:column; justify-content:center;
+    padding:48px 44px;
+    transform:translateX(100%); transition:transform 0.6s cubic-bezier(0.4,0,0.2,1);
+    pointer-events:none;
   }
-
-  .ad-panel.visible { transform: translateX(0); pointer-events: auto; }
-
-  .ad-panel-inner { max-width: 420px; margin: 0 auto; width: 100%; }
-
-  .ad-top-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 32px;
-  }
-
-  .ad-label {
-    font-size: 9px;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.22);
-  }
-
-  .ad-skip {
-    font-size: 11px;
-    color: rgba(255,255,255,0.35);
-    cursor: pointer;
-    padding: 5px 10px;
-    border-radius: 6px;
-    border: 1px solid rgba(255,255,255,0.1);
-    transition: all 0.2s;
-    font-family: 'DM Mono', monospace;
-  }
-
-  .ad-skip:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
-
-  .ad-image-placeholder {
-    width: 100%;
-    aspect-ratio: 16/7;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #1e2d4a 0%, #2a1640 50%, #1a2d1a 100%);
-    margin-bottom: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .ad-image-placeholder::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse at 30% 50%, rgba(80,140,255,0.18) 0%, transparent 60%),
-                radial-gradient(ellipse at 75% 60%, rgba(180,80,255,0.12) 0%, transparent 55%);
-  }
-
-  .ad-img-label {
-    font-size: 10px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.18);
-    z-index: 1;
-  }
-
-  .ad-brand {
-    font-size: 10px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.32);
-    margin-bottom: 10px;
-  }
-
-  .ad-headline {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(22px, 3vw, 34px);
-    font-weight: 800;
-    color: #fff;
-    line-height: 1.1;
-    margin-bottom: 14px;
-  }
-
-  .ad-body {
-    font-size: 13px;
-    color: rgba(255,255,255,0.42);
-    line-height: 1.65;
-    margin-bottom: 28px;
-  }
-
-  .ad-cta {
-    display: inline-block;
-    padding: 12px 28px;
-    background: #fff;
-    color: #080c14;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: 'DM Mono', monospace;
-    transition: opacity 0.2s;
-    margin-bottom: 28px;
-  }
-
-  .ad-cta:hover { opacity: 0.85; }
-
-  .ad-timer-bar { height: 2px; background: rgba(255,255,255,0.07); border-radius: 1px; overflow: hidden; }
-  .ad-timer-fill { height: 100%; background: rgba(255,255,255,0.3); transform-origin: left; border-radius: 1px; }
-
-  .ad-divider {
-    position: absolute;
-    top: 0; left: 50%;
-    width: 1px; height: 100%;
-    background: rgba(255,255,255,0.06);
-    z-index: 601;
-    transform: scaleX(0);
-    transition: transform 0.6s cubic-bezier(0.4,0,0.2,1) 0.3s;
-  }
-  .ad-divider.visible { transform: scaleX(1); }
-
-  /* ── CITY FADE ── */
-  .fade-cover {
-    position: absolute; inset: 0;
-    background: var(--bg);
-    z-index: 700;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.35s ease;
-  }
-  .fade-cover.active { opacity: 1; }
+  .ad-panel.visible { transform:translateX(0); pointer-events:auto; }
+  .ad-panel-inner { max-width:420px; margin:0 auto; width:100%; }
+  .ad-top-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
+  .ad-label { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:rgba(255,255,255,0.22); }
+  .ad-skip { font-size:11px; color:rgba(255,255,255,0.35); cursor:pointer; padding:5px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); transition:all 0.2s; }
+  .ad-skip:hover { color:#fff; border-color:rgba(255,255,255,0.3); }
+  .ad-image-placeholder { width:100%; aspect-ratio:16/7; border-radius:12px; background:linear-gradient(135deg,#1e2d4a 0%,#2a1640 50%,#1a2d1a 100%); margin-bottom:28px; display:flex; align-items:center; justify-content:center; }
+  .ad-img-label { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:rgba(255,255,255,0.18); }
+  .ad-brand { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:rgba(255,255,255,0.32); margin-bottom:10px; }
+  .ad-headline { font-family:'Syne',sans-serif; font-size:clamp(22px,3vw,34px); font-weight:800; color:#fff; line-height:1.1; margin-bottom:14px; }
+  .ad-body { font-size:13px; color:rgba(255,255,255,0.42); line-height:1.65; margin-bottom:28px; }
+  .ad-cta { display:inline-block; padding:12px 28px; background:#fff; color:#080c14; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; margin-bottom:28px; }
+  .ad-timer-bar { height:2px; background:rgba(255,255,255,0.07); border-radius:1px; overflow:hidden; }
+  .ad-timer-fill { height:100%; background:rgba(255,255,255,0.3); transform-origin:left; border-radius:1px; }
+  .ad-divider { position:absolute; top:0; left:50%; width:1px; height:100%; background:rgba(255,255,255,0.06); z-index:601; transform:scaleX(0); transition:transform 0.6s cubic-bezier(0.4,0,0.2,1) 0.3s; }
+  .ad-divider.visible { transform:scaleX(1); }
+  .fade-cover { position:absolute; inset:0; background:var(--bg); z-index:700; opacity:0; pointer-events:none; transition:opacity 0.35s ease; }
+  .fade-cover.active { opacity:1; }
 </style>
 </head>
 <body>
 
 <div id="map-wrap">
-  <div id="leaflet-map"></div>
-  <div id="map-tint"></div>
-  <canvas id="train-canvas"></canvas>
+  <canvas id="mainCanvas"></canvas>
 </div>
 
 <div class="city-switcher">
@@ -403,28 +121,25 @@
 <div class="topbar">
   <div>
     <div class="city-name" id="cityName">New York City</div>
-    <div class="city-sub">Live Subway &middot; <span id="trainCountInline">0</span> trains active</div>
+    <div class="city-sub">Live Transit &middot; <span id="trainCountInline">0</span> trains active</div>
   </div>
   <div class="status-pill">
     <div class="pulse-dot"></div>
-    <span id="statusLabel">Connecting&hellip;</span>
+    <span id="statusLabel">Loading map&hellip;</span>
   </div>
 </div>
 
-<div class="train-count">
-  <span id="trainCountBig">0</span>trains
-</div>
+<div class="train-count"><span id="trainCountBig">0</span>trains</div>
 
 <div class="legend">
   <div class="lines-row" id="linesRow"></div>
   <div>
     <div class="clock-time" id="clockTime">--:--</div>
     <div class="clock-date" id="clockDate">---</div>
-    <div class="version-stamp" id="versionStamp">v1.0 · --</div>
+    <div class="version-stamp" id="versionStamp">v1.1</div>
   </div>
 </div>
 
-<!-- Split-screen ad -->
 <div class="ad-divider" id="adDivider"></div>
 <div class="ad-panel" id="adPanel">
   <div class="ad-panel-inner">
@@ -432,22 +147,20 @@
       <div class="ad-label">Advertisement</div>
       <div class="ad-skip" onclick="closeAd()">&#10005; Dismiss</div>
     </div>
-    <div class="ad-image-placeholder">
-      <div class="ad-img-label">Ad Creative</div>
-    </div>
+    <div class="ad-image-placeholder"><div class="ad-img-label">Ad Creative</div></div>
     <div class="ad-brand">Sponsored</div>
-    <div class="ad-headline">Explore NYC<br>Like Never Before</div>
-    <div class="ad-body">Discover hidden gems across all five boroughs with local guides curated by real New Yorkers.</div>
+    <div class="ad-headline">Explore the City<br>Like Never Before</div>
+    <div class="ad-body">Discover hidden gems with local guides curated by real residents.</div>
     <div class="ad-cta">Learn More</div>
     <div class="ad-timer-bar"><div class="ad-timer-fill" id="adTimerFill"></div></div>
   </div>
 </div>
-
 <div class="fade-cover" id="fadeCover"></div>
 
 <script>
-// ── CITY CONFIG ───────────────────────────────────────────────
-
+// ═══════════════════════════════════════════════════════════════
+// CITY DATA
+// ═══════════════════════════════════════════════════════════════
 const CITIES = {
   nyc: {
     name:   'New York City',
@@ -978,76 +691,181 @@ const CITIES = {
     ],
   };
 
-// ── LEAFLET MAP SETUP — deferred until DOM is fully sized ────
 
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_matter_lite/{z}/{x}/{y}{r}.png';
+// ═══════════════════════════════════════════════════════════════
+// TILE MAP ENGINE — pure canvas, no external library needed
+// Uses OpenStreetMap/CartoDB tiles drawn directly onto canvas
+// ═══════════════════════════════════════════════════════════════
 
-let leafletMap   = null;
-let routeLayer   = null;
+const TILE_URL = (z,x,y) =>
+  `https://cartodb-basemaps-a.global.ssl.fastly.net/dark_matter/${z}/${x}/${y}.png`;
 
-// ── TRAIN CANVAS (overlays the map) ──────────────────────────
+// Slippy map math
+const TILE_SIZE = 256;
 
-const trainCanvas = document.getElementById('train-canvas');
-const tCtx        = trainCanvas.getContext('2d');
-
-function resizeCanvas() {
-  trainCanvas.width  = window.innerWidth;
-  trainCanvas.height = window.innerHeight;
+function latLngToTile(lat, lng, zoom) {
+  const n = Math.pow(2, zoom);
+  const x = n * (lng + 180) / 360;
+  const latRad = lat * Math.PI / 180;
+  const y = n * (1 - Math.log(Math.tan(latRad) + 1/Math.cos(latRad)) / Math.PI) / 2;
+  return { x, y };
 }
 
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+function tileToLatLng(tx, ty, zoom) {
+  const n = Math.pow(2, zoom);
+  const lng = tx / n * 360 - 180;
+  const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n)));
+  return { lat: latRad * 180 / Math.PI, lng };
+}
 
-// ── STATE ─────────────────────────────────────────────────────
+// Convert lat/lng to canvas pixel given current view state
+function latLngToPixel(lat, lng) {
+  const tile = latLngToTile(lat, lng, view.zoom);
+  return {
+    x: (tile.x - view.tileOriginX) * TILE_SIZE,
+    y: (tile.y - view.tileOriginY) * TILE_SIZE,
+  };
+}
 
-let cityId  = 'nyc';
-let trains  = [];
+// ═══════════════════════════════════════════════════════════════
+// VIEW STATE
+// ═══════════════════════════════════════════════════════════════
 
-// ── DRAW ROUTES AS LEAFLET POLYLINES ─────────────────────────
+const canvas = document.getElementById('mainCanvas');
+const ctx    = canvas.getContext('2d');
+
+let view = {
+  lat: 40.740, lng: -73.980, zoom: 13,
+  tileOriginX: 0, tileOriginY: 0,   // top-left tile (fractional)
+  isDragging: false,
+  dragStartX: 0, dragStartY: 0,
+  dragOriginLng: 0, dragOriginLat: 0,
+};
+
+function resize() {
+  canvas.width  = canvas.parentElement.offsetWidth  || window.innerWidth;
+  canvas.height = canvas.parentElement.offsetHeight || window.innerHeight;
+  updateTileOrigin();
+}
+
+function updateTileOrigin() {
+  const centerTile = latLngToTile(view.lat, view.lng, view.zoom);
+  const tilesW = canvas.width  / TILE_SIZE;
+  const tilesH = canvas.height / TILE_SIZE;
+  view.tileOriginX = centerTile.x - tilesW / 2;
+  view.tileOriginY = centerTile.y - tilesH / 2;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TILE CACHE & DRAWING
+// ═══════════════════════════════════════════════════════════════
+
+const tileCache = new Map();
+const MAX_CACHE = 300;
+
+function getTile(z, tx, ty) {
+  const key = `${z}/${tx}/${ty}`;
+  if (tileCache.has(key)) return tileCache.get(key);
+
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => { needsRedraw = true; };
+  img.src = TILE_URL(z, tx, ty);
+
+  if (tileCache.size > MAX_CACHE) {
+    // evict oldest
+    const first = tileCache.keys().next().value;
+    tileCache.delete(first);
+  }
+  tileCache.set(key, img);
+  return img;
+}
+
+let needsRedraw = true;
+
+function drawTiles() {
+  const z  = Math.round(view.zoom);
+  const x0 = Math.floor(view.tileOriginX);
+  const y0 = Math.floor(view.tileOriginY);
+  const tilesW = Math.ceil(canvas.width  / TILE_SIZE) + 2;
+  const tilesH = Math.ceil(canvas.height / TILE_SIZE) + 2;
+
+  const offsetX = -(view.tileOriginX - x0) * TILE_SIZE;
+  const offsetY = -(view.tileOriginY - y0) * TILE_SIZE;
+
+  const maxTile = Math.pow(2, z);
+
+  for (let ty = 0; ty < tilesH; ty++) {
+    for (let tx = 0; tx < tilesW; tx++) {
+      const tileX = ((x0 + tx) % maxTile + maxTile) % maxTile;
+      const tileY = y0 + ty;
+      if (tileY < 0 || tileY >= maxTile) continue;
+
+      const img = getTile(z, tileX, tileY);
+      const px  = offsetX + tx * TILE_SIZE;
+      const py  = offsetY + ty * TILE_SIZE;
+
+      if (img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, px, py, TILE_SIZE, TILE_SIZE);
+      } else {
+        ctx.fillStyle = '#0d1220';
+        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      }
+    }
+  }
+
+  // Subtle dark tint so train lines pop
+  ctx.fillStyle = 'rgba(4,8,18,0.25)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAW ROUTES
+// ═══════════════════════════════════════════════════════════════
 
 function drawRoutes() {
-  if (!routeLayer) return;
-  routeLayer.clearLayers();
   const cfg = CITIES[cityId];
-
   cfg.routes.forEach(route => {
-    // Glow pass (thick, transparent)
-    L.polyline(route.path, {
-      color:   route.color,
-      weight:  14,
-      opacity: 0.12,
-      lineCap: 'round',
-      lineJoin:'round',
-    }).addTo(routeLayer);
+    const pts = route.path.map(([lat,lng]) => latLngToPixel(lat, lng));
+    if (pts.length < 2) return;
+
+    // Glow
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = route.color + '30';
+    ctx.lineWidth   = 14;
+    ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.stroke();
 
     // Main line
-    L.polyline(route.path, {
-      color:   route.color,
-      weight:  3.5,
-      opacity: 0.75,
-      lineCap: 'round',
-      lineJoin:'round',
-    }).addTo(routeLayer);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = route.color + 'cc';
+    ctx.lineWidth   = 3.5;
+    ctx.stroke();
 
     // Station dots
-    route.path.forEach(pt => {
-      L.circleMarker(pt, {
-        radius:      4,
-        fillColor:   route.color,
-        color:       route.color,
-        fillOpacity: 0.8,
-        weight:      0,
-      }).addTo(routeLayer);
+    pts.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = route.color + 'cc';
+      ctx.fill();
     });
   });
 }
 
-// ── TRAIN SIMULATION ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// TRAIN SIMULATION
+// ═══════════════════════════════════════════════════════════════
+
+let cityId = 'nyc';
+let trains = [];
 
 function spawnTrains() {
   trains = [];
   CITIES[cityId].routes.forEach(route => {
-    // 5–8 trains per route gives a realistic density for busy metro systems
     const n = 5 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) {
       trains.push({
@@ -1060,10 +878,6 @@ function spawnTrains() {
       });
     }
   });
-  syncCounts();
-}
-
-function syncCounts() {
   document.getElementById('trainCountBig').textContent    = trains.length;
   document.getElementById('trainCountInline').textContent = trains.length;
 }
@@ -1073,8 +887,10 @@ function trainLatLng(tr) {
   const pos  = tr.t * (path.length - 1);
   const i    = Math.min(Math.floor(pos), path.length - 2);
   const f    = pos - i;
-  const a    = path[i], b = path[i + 1];
-  return [ a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f ];
+  return [
+    path[i][0] + (path[i+1][0] - path[i][0]) * f,
+    path[i][1] + (path[i+1][1] - path[i][1]) * f,
+  ];
 }
 
 function stepTrains(dt) {
@@ -1094,106 +910,143 @@ function stepTrains(dt) {
   });
 }
 
-// ── DRAW TRAINS ON CANVAS ────────────────────────────────────
-
 function drawTrains() {
-  const w = trainCanvas.width, h = trainCanvas.height;
-  tCtx.clearRect(0, 0, w, h);
-  if (!leafletMap) return;
-
   trains.forEach(tr => {
     const [lat, lng] = trainLatLng(tr);
+    const { x, y }  = latLngToPixel(lat, lng);
 
-    // Convert lat/lng → pixel using Leaflet's projection
-    const pt = leafletMap.latLngToContainerPoint([lat, lng]);
-    const x  = pt.x, y = pt.y;
+    if (x < -30 || x > canvas.width+30 || y < -30 || y > canvas.height+30) return;
 
-    if (x < -30 || x > w + 30 || y < -30 || y > h + 30) return;
-
-    const r     = 11;
+    const r     = 10;
     const pulse = (Math.sin(tr.phase) + 1) / 2;
     const col   = tr.route.color;
 
-    // Pulse ring when stopped
+    // Pulse ring
     if (tr.status === 'STOP') {
-      tCtx.beginPath();
-      tCtx.arc(x, y, r * (1.8 + pulse * 1.0), 0, Math.PI * 2);
-      const a = Math.round(pulse * 120).toString(16).padStart(2, '0');
-      tCtx.strokeStyle = col + a;
-      tCtx.lineWidth   = 2;
-      tCtx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, r * (1.8 + pulse), 0, Math.PI*2);
+      const a = Math.round(pulse * 120).toString(16).padStart(2,'0');
+      ctx.strokeStyle = col + a;
+      ctx.lineWidth   = 2;
+      ctx.stroke();
     }
 
-    // Glow halo
-    const grd = tCtx.createRadialGradient(x, y, 0, x, y, r * 3);
-    grd.addColorStop(0, col + 'cc');
-    grd.addColorStop(1, col + '00');
-    tCtx.beginPath();
-    tCtx.arc(x, y, r * 3, 0, Math.PI * 2);
-    tCtx.fillStyle = grd;
-    tCtx.fill();
+    // Glow
+    const grd = ctx.createRadialGradient(x,y,0, x,y,r*3);
+    grd.addColorStop(0, col+'bb');
+    grd.addColorStop(1, col+'00');
+    ctx.beginPath();
+    ctx.arc(x, y, r*3, 0, Math.PI*2);
+    ctx.fillStyle = grd;
+    ctx.fill();
 
     // Circle
-    tCtx.beginPath();
-    tCtx.arc(x, y, r, 0, Math.PI * 2);
-    tCtx.fillStyle = col;
-    tCtx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fillStyle = col;
+    ctx.fill();
 
     // White ring
-    tCtx.beginPath();
-    tCtx.arc(x, y, r, 0, Math.PI * 2);
-    tCtx.strokeStyle = 'rgba(255,255,255,0.3)';
-    tCtx.lineWidth   = 1.5;
-    tCtx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
 
     // Label
-    const bright = ['#FFCD00','#FCCC0A','#B6BD00','#6CBE45','#6ECA97','#A7A9AC'];
-    tCtx.fillStyle      = bright.includes(col) ? '#111' : '#fff';
-    tCtx.font           = 'bold 9px DM Mono, monospace';
-    tCtx.textAlign      = 'center';
-    tCtx.textBaseline   = 'middle';
-    tCtx.fillText(tr.route.id, x, y + 0.5);
+    const bright = ['#FFCD00','#FCCC0A','#B6BD00','#6CBE45','#6ECA97','#A7A9AC','#FF9500','#C3A400'];
+    ctx.fillStyle     = bright.includes(col) ? '#111' : '#fff';
+    ctx.font          = 'bold 8px DM Mono,monospace';
+    ctx.textAlign     = 'center';
+    ctx.textBaseline  = 'middle';
+    ctx.fillText(tr.route.id, x, y + 0.5);
   });
 }
 
-// ── RENDER LOOP ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// RENDER LOOP
+// ═══════════════════════════════════════════════════════════════
 
 let last = 0;
 function loop(ts) {
   const dt = Math.min(ts - last, 100);
   last = ts;
   stepTrains(dt);
+  updateTileOrigin();
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawTiles();
+  drawRoutes();
   drawTrains();
+
   requestAnimationFrame(loop);
 }
 
-// ── CITY SWITCH ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// PAN & ZOOM
+// ═══════════════════════════════════════════════════════════════
+
+canvas.addEventListener('mousedown', e => {
+  view.isDragging   = true;
+  view.dragStartX   = e.clientX;
+  view.dragStartY   = e.clientY;
+  view.dragOriginLat = view.lat;
+  view.dragOriginLng = view.lng;
+  canvas.style.cursor = 'grabbing';
+});
+
+window.addEventListener('mousemove', e => {
+  if (!view.isDragging) return;
+  const dx = e.clientX - view.dragStartX;
+  const dy = e.clientY - view.dragStartY;
+  const scale = 1 / (TILE_SIZE * Math.pow(2, view.zoom));
+  // Convert pixel delta to lat/lng delta
+  const centerTile = latLngToTile(view.dragOriginLat, view.dragOriginLng, view.zoom);
+  const newTileX = centerTile.x - dx / TILE_SIZE;
+  const newTileY = centerTile.y - dy / TILE_SIZE;
+  const n = Math.pow(2, view.zoom);
+  view.lng = newTileX / n * 360 - 180;
+  const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * newTileY / n)));
+  view.lat = latRad * 180 / Math.PI;
+});
+
+window.addEventListener('mouseup', () => {
+  view.isDragging = false;
+  canvas.style.cursor = 'default';
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const zoomDelta = e.deltaY < 0 ? 0.5 : -0.5;
+  view.zoom = Math.max(10, Math.min(17, view.zoom + zoomDelta));
+}, { passive: false });
+
+// ═══════════════════════════════════════════════════════════════
+// CITY SWITCH
+// ═══════════════════════════════════════════════════════════════
 
 function switchCity(id, btn) {
   if (id === cityId) return;
   const cover = document.getElementById('fadeCover');
   cover.classList.add('active');
-
   setTimeout(() => {
-    cityId = id;
+    cityId   = id;
     const cfg = CITIES[id];
+    view.lat  = cfg.center[0];
+    view.lng  = cfg.center[1];
+    view.zoom = cfg.zoom;
     document.getElementById('cityName').textContent = cfg.name;
-
-    // Fly map to new city
-    leafletMap.setView(cfg.center, cfg.zoom, { animate: false });
-
-    drawRoutes();
     spawnTrains();
     renderLegend();
-
     document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-
     setTimeout(() => cover.classList.remove('active'), 380);
   }, 350);
 }
 
-// ── LEGEND ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// LEGEND
+// ═══════════════════════════════════════════════════════════════
 
 function renderLegend() {
   document.getElementById('linesRow').innerHTML = CITIES[cityId].lines.map(l =>
@@ -1204,10 +1057,12 @@ function renderLegend() {
   ).join('');
 }
 
-// ── CLOCK + VERSION ───────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// CLOCK + VERSION
+// ═══════════════════════════════════════════════════════════════
 
-const VERSION = 'v1.1';
-const LAST_EDIT = '2026-05-26'; // updated automatically on each push
+const VERSION   = 'v1.1';
+const LAST_EDIT = '2026-05-26';
 
 function tick() {
   const n  = new Date();
@@ -1218,10 +1073,12 @@ function tick() {
   document.getElementById('clockDate').textContent = n.toLocaleDateString('en-US',
     { weekday:'short', month:'short', day:'numeric' }).toUpperCase();
   document.getElementById('versionStamp').textContent =
-    `${VERSION} · edited ${LAST_EDIT} · ${hh}:${mm}:${ss}`;
+    `${VERSION} · ${LAST_EDIT} · ${hh}:${mm}:${ss}`;
 }
 
-// ── ADS — 5-MINUTE SPLIT SCREEN ──────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// ADS
+// ═══════════════════════════════════════════════════════════════
 
 const AD_INTERVAL = 5 * 60 * 1000;
 const AD_DURATION = 30 * 1000;
@@ -1238,18 +1095,13 @@ function showAd() {
   document.body.classList.add('ad-active-ui');
   document.getElementById('adPanel').classList.add('visible');
   document.getElementById('adDivider').classList.add('visible');
-
-  // Shrink map so Leaflet knows its container changed
-  setTimeout(() => leafletMap.invalidateSize(), 650);
-
+  setTimeout(resize, 650);
   const fill = document.getElementById('adTimerFill');
-  fill.style.transition = 'none';
-  fill.style.transform  = 'scaleX(1)';
+  fill.style.transition = 'none'; fill.style.transform = 'scaleX(1)';
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    fill.style.transition = `transform ${AD_DURATION / 1000}s linear`;
+    fill.style.transition = `transform ${AD_DURATION/1000}s linear`;
     fill.style.transform  = 'scaleX(0)';
   }));
-
   adAutoDismiss = setTimeout(closeAd, AD_DURATION);
 }
 
@@ -1260,42 +1112,34 @@ function closeAd() {
   setTimeout(() => {
     document.getElementById('map-wrap').classList.remove('ad-active');
     document.body.classList.remove('ad-active-ui');
-    setTimeout(() => leafletMap.invalidateSize(), 650);
+    setTimeout(resize, 650);
   }, 600);
   scheduleAd();
 }
 
-// ── INIT ──────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
 
-window.addEventListener('load', () => {
-  // Build Leaflet AFTER the DOM is painted and sized — this is critical
-  leafletMap = L.map('leaflet-map', {
-    zoomControl:        false,
-    attributionControl: false,
-    dragging:           true,
-    scrollWheelZoom:    true,
-    doubleClickZoom:    false,
-  });
+window.addEventListener('resize', resize);
+resize();
 
-  L.tileLayer(TILE_URL, { maxZoom: 19 }).addTo(leafletMap);
-  routeLayer = L.layerGroup().addTo(leafletMap);
+const cfg0 = CITIES[cityId];
+view.lat  = cfg0.center[0];
+view.lng  = cfg0.center[1];
+view.zoom = cfg0.zoom;
 
-  const cfg0 = CITIES[cityId];
-  leafletMap.setView(cfg0.center, cfg0.zoom);
+renderLegend();
+spawnTrains();
+tick();
+setInterval(tick, 1000);
+scheduleAd();
 
-  drawRoutes();
-  spawnTrains();
-  renderLegend();
-  tick();
-  setInterval(tick, 1000);
-  scheduleAd();
+setTimeout(() => {
+  document.getElementById('statusLabel').textContent = 'Live · 20s refresh';
+}, 1500);
 
-  setTimeout(() => {
-    document.getElementById('statusLabel').textContent = 'Live · 20s refresh';
-  }, 1500);
-
-  requestAnimationFrame(loop);
-});
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
