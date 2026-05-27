@@ -1,180 +1,219 @@
 /**
- * Transit Map - Cloudflare Worker
- * Decodes GTFS-RT protobuf feeds → clean JSON for all platforms
- * Supports: NYC MTA, Paris IDFM (extensible to any GTFS-RT city)
+ * TransitMap Cloudflare Worker
+ * Fetches MTA GTFS-RT feeds, decodes protobuf, returns clean JSON.
+ * Deploy: wrangler deploy
+ * Secret: wrangler secret put MTA_API_KEY
  */
 
-import { decodeFeed } from './gtfs-decoder.js';
-import { CITY_CONFIGS } from './cities.js';
+const CORS = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
-// Ad config — change here, all platforms update automatically
-const AD_CONFIG = {
-  intervalSeconds: 300,        // 5 minutes
-  durationSeconds: 30,         // max ad display time
-  enabled: true,
+// MTA feed URLs — one per line group
+const MTA_FEEDS = [
+  'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs',        // 1 2 3 4 5 6 7
+  'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace',    // A C E
+  'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm',   // B D F M
+  'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g',      // G
+  'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz',     // J Z
+  'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw',   // N Q R W
+  'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l',      // L
+  'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-si',     // S (Staten Island)
+];
+
+// Official MTA line colors
+const LINE_COLORS = {
+  '1':'#EE352E','2':'#EE352E','3':'#EE352E',
+  '4':'#00933C','5':'#00933C','6':'#00933C',
+  '7':'#B933AD',
+  'A':'#2850AD','C':'#2850AD','E':'#2850AD',
+  'B':'#FF6319','D':'#FF6319','F':'#FF6319','M':'#FF6319',
+  'G':'#6CBE45',
+  'J':'#996633','Z':'#996633',
+  'L':'#A7A9AC',
+  'N':'#FCCC0A','Q':'#FCCC0A','R':'#FCCC0A','W':'#FCCC0A',
+  'S':'#808183',
 };
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    const origin = request.headers.get('Origin') || '*';
+    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
-    // CORS headers for all platforms
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
-      'Access-Control-Max-Age': '86400',
-    };
+    const path = new URL(request.url).pathname;
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+    if (path === '/health') {
+      return json({ status: 'ok', ts: new Date().toISOString() });
     }
 
-    const path = url.pathname;
+    if (path === '/trains/nyc') {
+      const key = env.MTA_API_KEY;
+      if (!key) return json({ error: 'MTA_API_KEY secret not set' }, 500);
 
-    // ── Routes ──────────────────────────────────────────────
-    try {
-      // GET /cities — list all supported cities
-      if (path === '/cities') {
-        return jsonResponse(
-          Object.entries(CITY_CONFIGS).map(([id, c]) => ({
-            id,
-            name: c.name,
-            country: c.country,
-            center: c.center,
-            zoom: c.defaultZoom,
-            lines: c.lines.map(l => ({ id: l.id, name: l.name, color: l.color })),
-          })),
-          corsHeaders
-        );
+      try {
+        const trains = await fetchAllMTATrains(key);
+        return json({ city: 'nyc', count: trains.length, updatedAt: new Date().toISOString(), trains });
+      } catch (e) {
+        return json({ error: e.message }, 500);
       }
-
-      // GET /trains/:cityId — live train positions for a city
-      if (path.startsWith('/trains/')) {
-        const cityId = path.split('/')[2];
-        const city = CITY_CONFIGS[cityId];
-        if (!city) return errorResponse(404, `City '${cityId}' not found`, corsHeaders);
-
-        const trains = await fetchTrains(city, env);
-        return jsonResponse({ city: cityId, updatedAt: new Date().toISOString(), trains }, corsHeaders);
-      }
-
-      // GET /config — ad config + app settings for all platforms
-      if (path === '/config') {
-        return jsonResponse({ ads: AD_CONFIG, version: '1.0.0' }, corsHeaders);
-      }
-
-      // GET /health
-      if (path === '/health') {
-        return jsonResponse({ status: 'ok', timestamp: new Date().toISOString() }, corsHeaders);
-      }
-
-      return errorResponse(404, 'Not found', corsHeaders);
-
-    } catch (err) {
-      console.error('Worker error:', err);
-      return errorResponse(500, err.message, corsHeaders);
     }
-  },
+
+    return json({ error: 'Not found. Try /trains/nyc or /health' }, 404);
+  }
 };
 
-// ── Train fetching ───────────────────────────────────────────
+// ── Fetch all 8 MTA feeds concurrently ───────────────────────
 
-async function fetchTrains(city, env) {
-  const allTrains = [];
+async function fetchAllMTATrains(apiKey) {
+  const results = await Promise.allSettled(
+    MTA_FEEDS.map(url => fetchFeed(url, apiKey))
+  );
 
-  for (const feed of city.feeds) {
-    const feedUrl = buildFeedUrl(feed, env);
-
-    const response = await fetch(feedUrl, {
-      headers: feed.apiKeyHeader
-        ? { [feed.apiKeyHeader]: env[feed.apiKeyEnvVar] }
-        : {},
-      cf: { cacheTtl: 15 }, // Cloudflare edge cache for 15s
-    });
-
-    if (!response.ok) {
-      console.warn(`Feed ${feed.id} returned ${response.status}`);
-      continue;
-    }
-
-    const buffer = await response.arrayBuffer();
-    const decoded = decodeFeed(buffer);
-    const trains = extractTrainPositions(decoded, city, feed);
-    allTrains.push(...trains);
-  }
-
-  return allTrains;
-}
-
-function buildFeedUrl(feed, env) {
-  // MTA uses ?key= param, others use headers
-  if (feed.apiKeyParam && env[feed.apiKeyEnvVar]) {
-    return `${feed.url}?key=${env[feed.apiKeyEnvVar]}`;
-  }
-  return feed.url;
-}
-
-function extractTrainPositions(decoded, city, feed) {
   const trains = [];
-  const now = Math.floor(Date.now() / 1000);
+  const now    = Math.floor(Date.now() / 1000);
 
-  for (const entity of decoded.entity || []) {
-    // Vehicle position entities
-    if (entity.vehicle?.position) {
-      const v = entity.vehicle;
-      const lineId = resolveLineId(v.trip?.routeId, feed.routePrefix);
-      const line = city.lines.find(l => l.id === lineId);
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    for (const entity of result.value) {
+      if (!entity.vehicle?.position) continue;
+
+      const v       = entity.vehicle;
+      const routeId = v.trip?.routeId ?? '';
+      const color   = LINE_COLORS[routeId] ?? '#888888';
+      const stale   = now - (v.timestamp ?? now);
+      if (stale > 180) continue;   // skip positions older than 3 minutes
 
       trains.push({
-        id: entity.id,
-        lineId,
-        lineName: line?.name ?? lineId,
-        lineColor: line?.color ?? '#888888',
-        lat: v.position.latitude,
-        lng: v.position.longitude,
-        bearing: v.position.bearing ?? null,
-        speed: v.position.speed ?? null,
-        status: vehicleStatus(v.currentStatus),
-        stopId: v.stopId ?? null,
-        tripId: v.trip?.tripId ?? null,
-        timestamp: v.timestamp ?? now,
-        staleSeconds: now - (v.timestamp ?? now),
+        id:      entity.id,
+        line:    routeId,
+        color,
+        lat:     v.position.latitude,
+        lng:     v.position.longitude,
+        bearing: v.position.bearing  ?? null,
+        status:  ['INCOMING','AT_STOP','IN_TRANSIT'][v.currentStatus] ?? 'IN_TRANSIT',
+        trip:    v.trip?.tripId ?? null,
+        stale,
       });
     }
   }
 
-  // Filter out stale positions (>3 minutes old)
-  return trains.filter(t => t.staleSeconds < 180);
+  return trains;
 }
 
-function resolveLineId(routeId, prefix) {
-  if (!routeId) return 'unknown';
-  // MTA routes like "1", "A", "L" — strip any prefix added by feed
-  return prefix ? routeId.replace(prefix, '') : routeId;
-}
-
-function vehicleStatus(status) {
-  const map = { 0: 'INCOMING', 1: 'AT_STOP', 2: 'IN_TRANSIT' };
-  return map[status] ?? 'IN_TRANSIT';
-}
-
-// ── Helpers ──────────────────────────────────────────────────
-
-function jsonResponse(data, corsHeaders) {
-  return new Response(JSON.stringify(data), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
-      ...corsHeaders,
-    },
+async function fetchFeed(url, apiKey) {
+  const resp = await fetch(url, {
+    headers: { 'x-api-key': apiKey },
+    cf:      { cacheTtl: 20 },
   });
+  if (!resp.ok) throw new Error(`Feed ${url} → ${resp.status}`);
+  const buf = await resp.arrayBuffer();
+  return decodeFeedMessage(new Uint8Array(buf));
 }
 
-function errorResponse(status, message, corsHeaders) {
-  return new Response(JSON.stringify({ error: message }), {
+// ── Minimal GTFS-RT protobuf decoder ─────────────────────────
+// Decodes only the fields we need: entity, vehicle, position, trip
+
+function decodeFeedMessage(bytes) {
+  const r = new PB(bytes);
+  const entities = [];
+  while (r.ok()) {
+    const { f, w } = r.tag();
+    if (f === 2 && w === 2) entities.push(decodeEntity(r.bytes()));
+    else r.skip(w);
+  }
+  return entities;
+}
+
+function decodeEntity(bytes) {
+  const r = new PB(bytes);
+  const e = { id: '', vehicle: null };
+  while (r.ok()) {
+    const { f, w } = r.tag();
+    if      (f === 1 && w === 2) e.id      = r.str();
+    else if (f === 4 && w === 2) e.vehicle = decodeVehicle(r.bytes());
+    else r.skip(w);
+  }
+  return e;
+}
+
+function decodeVehicle(bytes) {
+  const r = new PB(bytes);
+  const v = { trip: {}, position: null, currentStatus: 2, timestamp: 0, stopId: null };
+  while (r.ok()) {
+    const { f, w } = r.tag();
+    if      (f === 1 && w === 2) v.trip          = decodeTrip(r.bytes());
+    else if (f === 2 && w === 2) v.position      = decodePosition(r.bytes());
+    else if (f === 4 && w === 0) v.currentStatus = r.varint();
+    else if (f === 5 && w === 0) v.timestamp     = r.varint();
+    else if (f === 7 && w === 2) v.stopId        = r.str();
+    else r.skip(w);
+  }
+  return v;
+}
+
+function decodeTrip(bytes) {
+  const r = new PB(bytes);
+  const t = { tripId: null, routeId: '' };
+  while (r.ok()) {
+    const { f, w } = r.tag();
+    if      (f === 1 && w === 2) t.tripId  = r.str();
+    else if (f === 3 && w === 2) t.routeId = r.str();
+    else r.skip(w);
+  }
+  return t;
+}
+
+function decodePosition(bytes) {
+  const r = new PB(bytes);
+  const p = { latitude: 0, longitude: 0, bearing: null, speed: null };
+  while (r.ok()) {
+    const { f, w } = r.tag();
+    if      (f === 1 && w === 5) p.latitude  = r.float();
+    else if (f === 2 && w === 5) p.longitude = r.float();
+    else if (f === 3 && w === 5) p.bearing   = r.float();
+    else if (f === 5 && w === 5) p.speed     = r.float();
+    else r.skip(w);
+  }
+  return p;
+}
+
+// Minimal protobuf reader
+class PB {
+  constructor(b) { this.b = b; this.p = 0; }
+  ok()  { return this.p < this.b.length; }
+  tag() { const v = this.varint(); return { f: v >>> 3, w: v & 7 }; }
+  varint() {
+    let r = 0, s = 0;
+    while (true) {
+      const b = this.b[this.p++];
+      r |= (b & 0x7f) << s; s += 7;
+      if (!(b & 0x80)) break;
+    }
+    return r >>> 0;
+  }
+  bytes() {
+    const len = this.varint();
+    const sl  = this.b.slice(this.p, this.p + len);
+    this.p   += len;
+    return sl;
+  }
+  str()   { return new TextDecoder().decode(this.bytes()); }
+  float() {
+    const v = new DataView(this.b.buffer, this.b.byteOffset + this.p, 4).getFloat32(0, true);
+    this.p += 4; return v;
+  }
+  skip(w) {
+    if      (w === 0) this.varint();
+    else if (w === 1) this.p += 8;
+    else if (w === 2) { const l = this.varint(); this.p += l; }
+    else if (w === 5) this.p += 4;
+  }
+}
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data, null, 2), {
     status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    headers: { 'Content-Type': 'application/json', ...CORS },
   });
 }
