@@ -722,15 +722,21 @@ function spawnTrains() {
 // Fetch real trains from worker and merge into simulation format
 async function fetchRealTrains() {
   if (!WORKER_URL) return;
-  if (cityId !== 'nyc' && cityId !== 'seattle' && cityId !== 'paris') return;
+  // Capture cityId NOW — the fetch is async and the user may switch cities
+  // before the response arrives. All state mutations check this snapshot.
+  const fetchedCity = cityId;
+  if (fetchedCity !== 'nyc' && fetchedCity !== 'seattle' && fetchedCity !== 'paris') return;
 
   try {
-    const resp = await fetch(`${WORKER_URL}/trains/${cityId}`);
+    const resp = await fetch(`${WORKER_URL}/trains/${fetchedCity}`);
     if (!resp.ok) throw new Error(`Worker ${resp.status}`);
     const data = await resp.json();
 
-    const city = CITIES[cityId];
-    const agency = cityId === 'nyc' ? 'MTA' : cityId === 'paris' ? 'RATP' : 'Sound Transit';
+    // User switched cities while the request was in-flight — discard silently.
+    if (cityId !== fetchedCity) return;
+
+    const city   = CITIES[fetchedCity];
+    const agency = fetchedCity === 'nyc' ? 'MTA' : fetchedCity === 'paris' ? 'RATP' : 'Sound Transit';
 
     // Build a lookup of existing train positions for smooth lerp
     const prevPos = {};
@@ -774,6 +780,8 @@ async function fetchRealTrains() {
       `Live · ${data.count} trains · ${agency} · updated ${hh}:${mm}:${ss}`;
 
   } catch (e) {
+    // Only show the error if we're still on the city that triggered this fetch
+    if (cityId !== fetchedCity) return;
     console.warn('Worker fetch failed:', e.message);
     document.getElementById('statusLabel').textContent = 'Live · fetch error — retrying…';
   }
