@@ -86,6 +86,7 @@
   <div>
     <div class="city-name" id="cityName">New York City</div>
     <div class="city-sub">Live Transit &middot; <span id="trainCountInline">0</span> trains active</div>
+    <div class="city-sub" id="localTime" style="margin-top:4px; letter-spacing:1px;"></div>
   </div>
   <div class="status-pill">
     <div class="pulse-dot"></div>
@@ -903,7 +904,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v1.2', LAST_EDIT='2026-05-27 03:55 UTC'; // updated on every push
+const VERSION='v1.2', LAST_EDIT='2026-05-27 04:02 UTC'; // updated on every push // updated on every push
 function tick() {
   const n=new Date();
   const hh=String(n.getHours()).padStart(2,'0');
@@ -912,6 +913,9 @@ function tick() {
   document.getElementById('clockTime').textContent=`${hh}:${mm}`;
   document.getElementById('clockDate').textContent=n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}).toUpperCase();
   document.getElementById('versionStamp').textContent=`${VERSION} · built ${LAST_EDIT} · now ${hh}:${mm}:${ss}`;
+  const localStr = n.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' })
+    + ' · ' + n.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  document.getElementById('localTime').textContent = localStr;
 }
 
 // ── ADS ───────────────────────────────────────────────────────
