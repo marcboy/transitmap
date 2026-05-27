@@ -1,8 +1,8 @@
 /**
  * TransitMap Cloudflare Worker
- * Fetches MTA GTFS-RT feeds, decodes protobuf, returns clean JSON.
+ * Fetches MTA GTFS-RT feeds (no API key required as of 2025),
+ * decodes protobuf, returns clean JSON.
  * Deploy: wrangler deploy
- * Secret: wrangler secret put MTA_API_KEY
  */
 
 const CORS = {
@@ -11,7 +11,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-// MTA feed URLs — one per line group
+// MTA feed URLs — no API key required
 const MTA_FEEDS = [
   'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs',        // 1 2 3 4 5 6 7
   'https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace',    // A C E
@@ -48,11 +48,8 @@ export default {
     }
 
     if (path === '/trains/nyc') {
-      const key = env.MTA_API_KEY;
-      if (!key) return json({ error: 'MTA_API_KEY secret not set' }, 500);
-
       try {
-        const trains = await fetchAllMTATrains(key);
+        const trains = await fetchAllMTATrains();
         return json({ city: 'nyc', count: trains.length, updatedAt: new Date().toISOString(), trains });
       } catch (e) {
         return json({ error: e.message }, 500);
@@ -65,9 +62,9 @@ export default {
 
 // ── Fetch all 8 MTA feeds concurrently ───────────────────────
 
-async function fetchAllMTATrains(apiKey) {
+async function fetchAllMTATrains() {
   const results = await Promise.allSettled(
-    MTA_FEEDS.map(url => fetchFeed(url, apiKey))
+    MTA_FEEDS.map(url => fetchFeed(url))
   );
 
   const trains = [];
@@ -101,10 +98,9 @@ async function fetchAllMTATrains(apiKey) {
   return trains;
 }
 
-async function fetchFeed(url, apiKey) {
+async function fetchFeed(url) {
   const resp = await fetch(url, {
-    headers: { 'x-api-key': apiKey },
-    cf:      { cacheTtl: 20 },
+    cf: { cacheTtl: 20 },
   });
   if (!resp.ok) throw new Error(`Feed ${url} → ${resp.status}`);
   const buf = await resp.arrayBuffer();
