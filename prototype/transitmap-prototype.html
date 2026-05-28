@@ -1167,7 +1167,7 @@ async function fetchRealTrains() {
       `Live · ${data.count} trains · ${agency} · updated ${hh}:${mm}:${ss}`;
     if (data.workerVersion && data.updatedAt) {
       document.getElementById('workerStamp').textContent =
-        `${data.workerVersion} · data ${toPT(data.updatedAt)} PT`;
+        `${data.workerVersion} · built ${toPT(data.updatedAt)}`;
     }
     _logFetch(fetchedCity, 'ok', `${data.count} trains`, elapsed);
 
