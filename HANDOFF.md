@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.5 (worker w4.1)  
+> **Prototype version:** v4.6 (worker w4.1)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -294,6 +294,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v4.6 | Fix version stamp format consistency: both lines now use YYYY-MM-DD · HH:MM PT (toPT() was producing MM/DD/YYYY format via toLocaleString) |
 | 2026-05-28 | v4.5 | Version stamp: added second line showing worker version + data timestamp in PT (e.g. "w4.1 · data 05/28/2026 · 15:44 PT"). Worker now returns workerVersion field in all city responses; WORKER_VERSION constant added to worker. Prototype uses toPT() helper (Intl.DateTimeFormat with America/Los_Angeles) to convert updatedAt UTC → PT |
 | 2026-05-28 | v4.4 | Paris animation rework — snap-to-route: instead of projecting both segment endpoints to route T values (caused jumps on symmetric/curved lines), now interpolates position in lat/lng space between the two stop coordinates, then snaps the interpolated point to the nearest point on the route polyline each frame. Simpler, more robust, eliminates wrong-direction and wrong-section artifacts. Added snapToRoute() helper; removed segTA/segTB |
 | 2026-05-28 | w4.1 | Paris: prevent trains skipping multiple stations — PRIM omits intermediate stops so adjacent time-sorted pairs can span 3-4 physical stations. Added distance cap: pairs more than 0.013° apart (~1.44km N-S, ~0.96km E-W at 48.8°N) are rejected. Paris Metro max legitimate inter-station ≈ 950m (La Défense→Esplanade). Both active-segment and fallback loops now use validPair() check. Deployed d3af5ffd |
