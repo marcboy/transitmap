@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.1 (worker v3.6)  
+> **Prototype version:** v4.2 (worker v3.7)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -250,6 +250,8 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v4.2 | Paris clock-driven animation: worker now returns timetable segment endpoints (aLat/aLng/tDep → bLat/bLng/tArr); client uses Date.now() to interpolate continuously — no velocity, no ID matching. Worker also returns upcoming segments (train departing soon) so 25% of trains have a segment vs 6% before. Cap at 180s filters PRIM multi-station gaps. Median segment 97s = correct Metro speed |
+| 2026-05-28 | w3.7 | Paris interpolation: worker returns seg {aLat,aLng,tDep,bLat,bLng,tArr} per train; fallback builds upcoming call[0]→call[1] segment so trains animate automatically when departure time passes; cap 180s filters multi-station PRIM gaps; calls slice 3→5 |
 | 2026-05-28 | v4.1 | Fetch stats panel: per-city success/fail counters (✓/✗ + %) displayed in fetch-log panel; resets at midnight (daily); skips don't count as attempts |
 | 2026-05-28 | v4.0 | Route-constrained animation: trains advance along their route polyline instead of dead-reckoning in lat/lng space. projectOnRouteT() snaps each reported position onto the track; routeSpeed (ΔrouteT/ms from last 2 fetches) drives per-frame motion. Trains never drift off their line. Direction is natural from sign of speed. No route path = stays at reported position |
 | 2026-05-28 | v3.9 | Dead-reckoning animation: replaced 15s lerp (froze when complete) with velocity extrapolation — measure speed from last 2 fetches, continue at that rate until next fetch corrects position. Trains now move continuously. First fetch has v=0; velocity resets on each new fetch pair. Cap at 120s to prevent runaway drift |

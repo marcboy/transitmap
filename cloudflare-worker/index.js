@@ -1104,8 +1104,11 @@ function lookupParisStopById(ref) {
   return m ? (PARIS_STOPS_BY_ID[m[1]] ?? null) : null;
 }
 
-// Interpolate a train's lat/lng between two consecutive stops.
-// Returns {lat, lng, bearing} or null if position cannot be determined.
+// Find the timetable segment containing `now` and return both the interpolated
+// position AND the raw segment endpoints + timestamps so the client can
+// re-interpolate continuously using Date.now() without needing another fetch.
+// Returns {lat, lng, bearing, seg} or null.
+// seg = { aLat, aLng, tDep, bLat, bLng, tArr } — absolute UTC ms timestamps.
 function interpolateParisPosition(calls, now) {
   const ms = s => { if (!s) return null; const t = new Date(s).getTime(); return isNaN(t) ? null : t; };
   const coordsOf = call => {
@@ -1116,38 +1119,53 @@ function interpolateParisPosition(calls, now) {
   // Walk pairs of consecutive stops looking for the segment containing `now`
   for (let i = 0; i < calls.length - 1; i++) {
     const a = calls[i], b = calls[i + 1];
-    // Best departure time from stop a: prefer expected, fall back to aimed
     const tDep = ms(a.ExpectedDepartureTime) ?? ms(a.AimedDepartureTime)
               ?? ms(a.ExpectedArrivalTime)   ?? ms(a.AimedArrivalTime);
-    // Best arrival time at stop b
     const tArr = ms(b.ExpectedArrivalTime) ?? ms(b.AimedArrivalTime);
     if (!tDep || !tArr || tArr <= tDep) continue;
+    if (tArr - tDep > 180000) continue; // skip multi-station gaps > 3 min
 
     if (now >= tDep && now <= tArr) {
       const cA = coordsOf(a), cB = coordsOf(b);
       if (!cA && !cB) continue;
-      if (!cA) return { lat: cB[0], lng: cB[1], bearing: null };
-      if (!cB) return { lat: cA[0], lng: cA[1], bearing: null };
+      if (!cA) return { lat: cB[0], lng: cB[1], bearing: null, seg: null };
+      if (!cB) return { lat: cA[0], lng: cA[1], bearing: null, seg: null };
       const t = (now - tDep) / (tArr - tDep);
       const lat = cA[0] + t * (cB[0] - cA[0]);
       const lng = cA[1] + t * (cB[1] - cA[1]);
       const bearing = Math.round(Math.atan2(cB[1] - cA[1], cB[0] - cA[0]) * 180 / Math.PI);
-      return { lat, lng, bearing };
+      // Return the segment so the client can drive animation from its own clock
+      return { lat, lng, bearing,
+               seg: { aLat: cA[0], aLng: cA[1], tDep, bLat: cB[0], bLng: cB[1], tArr } };
     }
   }
 
-  // No between-stop segment matched — show at the earliest upcoming stop
-  for (const call of calls) {
-    const t = ms(call.ExpectedArrivalTime) ?? ms(call.AimedArrivalTime);
-    if (t && now <= t) {
-      const c = coordsOf(call);
-      return c ? { lat: c[0], lng: c[1], bearing: null } : null;
-    }
+  // No active between-stop segment — train is approaching or waiting at calls[0].
+  // Build a forward segment from calls[i] → calls[i+1] so the client can animate
+  // automatically the moment tDep passes, without needing another fetch.
+  // Cap at 180s: PRIM sometimes skips intermediate stops, producing 5-10 minute
+  // "segments" that span multiple real stations — those make trains look frozen.
+  for (let i = 0; i < calls.length - 1; i++) {
+    const a = calls[i], b = calls[i + 1];
+    const tDep = ms(a.ExpectedDepartureTime) ?? ms(a.AimedDepartureTime)
+              ?? ms(a.ExpectedArrivalTime)   ?? ms(a.AimedArrivalTime);
+    const tArr = ms(b.ExpectedArrivalTime) ?? ms(b.AimedArrivalTime);
+    if (!tDep || !tArr || tArr <= tDep) continue;
+    if (tArr - tDep > 180000) continue; // skip multi-station gaps > 3 min
+    const cA = coordsOf(a), cB = coordsOf(b);
+    if (!cA || !cB) continue;
+    const t = Math.max(0, Math.min(1, (now - tDep) / (tArr - tDep)));
+    return {
+      lat: cA[0] + t*(cB[0]-cA[0]),
+      lng: cA[1] + t*(cB[1]-cA[1]),
+      bearing: Math.round(Math.atan2(cB[1]-cA[1], cB[0]-cA[0]) * 180/Math.PI),
+      seg: { aLat: cA[0], aLng: cA[1], tDep, bLat: cB[0], bLng: cB[1], tArr },
+    };
   }
 
-  // All times past — show at last stop (train near terminus)
-  const c = coordsOf(calls[calls.length - 1]);
-  return c ? { lat: c[0], lng: c[1], bearing: null } : null;
+  // Absolute fallback — no usable stops at all
+  const c = coordsOf(calls[0]);
+  return c ? { lat: c[0], lng: c[1], bearing: null, seg: null } : null;
 }
 
 async function fetchParisTrains(apiKey) {
@@ -1171,15 +1189,19 @@ async function fetchParisTrains(apiKey) {
         const line = PARIS_LINES[lineRef];
         if (!line) continue;
 
-        const vehicleRef = journey?.VehicleRef?.value ?? journey?.VehicleRef ?? '';
-        const calls = arr(journey?.EstimatedCalls?.EstimatedCall).slice(0, 3);
+        const vehicleRef  = journey?.VehicleRef?.value ?? journey?.VehicleRef ?? '';
+        const journeyRef  = journey?.DatedVehicleJourneyRef?.value
+                         ?? journey?.DatedVehicleJourneyRef
+                         ?? journey?.VehicleJourneyRef?.value
+                         ?? journey?.VehicleJourneyRef ?? '';
+        const calls = arr(journey?.EstimatedCalls?.EstimatedCall).slice(0, 5);
         if (calls.length === 0) continue;
 
         const pos = interpolateParisPosition(calls, now);
         if (!pos) continue;
 
         trains.push({
-          id:      vehicleRef || `${lineRef}-${trains.length}`,
+          id:      vehicleRef || journeyRef || `${lineRef}-${trains.length}`,
           line:    line.name,
           color:   line.color,
           lat:     Math.round(pos.lat * 100000) / 100000,
@@ -1187,6 +1209,7 @@ async function fetchParisTrains(apiKey) {
           bearing: pos.bearing,
           status:  'IN_TRANSIT',
           source:  'timetable-interpolated',
+          seg:     pos.seg,  // {aLat,aLng,tDep,bLat,bLng,tArr} for client-side clock animation
         });
       }
     }

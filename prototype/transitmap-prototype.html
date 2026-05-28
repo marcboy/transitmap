@@ -1140,6 +1140,7 @@ async function fetchRealTrains() {
         realLat:     t.lat,
         realLng:     t.lng,
         fetchTime,
+        seg:         t.seg ?? null,   // clock-driven segment (Paris); null for NYC/Seattle
         routeT,
         routeSpeed,
         animLat:     startLL[0],
@@ -1228,16 +1229,22 @@ function stepTrains(dt) {
     tr.phase += 0.05;
 
     if (tr.real) {
-      const hasRoute = tr.route.path && tr.route.path.length >= 2;
-      if (hasRoute && tr.routeSpeed !== 0) {
-        // Advance along the route polyline at the speed measured between the last
-        // two fetches. Trains always stay on their track — no drifting off the line.
-        // Clamp at [0, 1]: trains that reach a terminus stop there until new data.
+      if (tr.seg) {
+        // Clock-driven: interpolate between two timetable stops using Date.now().
+        // t<0 (before departure) → train waits at stop A.
+        // 0≤t≤1 (in transit)   → train moves smoothly to stop B.
+        // t>1 (segment expired) → train waits at stop B until next fetch.
+        // The segment timestamps are absolute UTC ms so cached responses still
+        // produce correct positions — no staleness problem.
+        const t = Math.max(0, Math.min(1, (Date.now() - tr.seg.tDep) / (tr.seg.tArr - tr.seg.tDep)));
+        tr.animLat = tr.seg.aLat + t * (tr.seg.bLat - tr.seg.aLat);
+        tr.animLng = tr.seg.aLng + t * (tr.seg.bLng - tr.seg.aLng);
+      } else if (tr.route.path && tr.route.path.length >= 2 && tr.routeSpeed !== 0) {
+        // Fallback for cities without segment data (NYC/Seattle): route-constrained animation
         tr.routeT = Math.max(0, Math.min(1, tr.routeT + tr.routeSpeed * dt));
         const ll = routeAtT(tr.route.path, tr.routeT);
         if (ll) { tr.animLat = ll[0]; tr.animLng = ll[1]; }
       }
-      // If routeSpeed is 0 (first fetch, or truly stopped) the train stays put.
 
       if (tr.status === 'STOP') {
         tr.stopMs += dt;
@@ -1379,7 +1386,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.1', LAST_EDIT='2026-05-29 · 01:00 PT'; // updated on every push
+const VERSION='v4.2', LAST_EDIT='2026-05-29 · 02:00 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();
