@@ -5,6 +5,16 @@
  * Stop coordinates are embedded in this worker (from MTA static GTFS).
  */
 
+// Per-request timestamp memo: reset at top of fetchParisTrains to avoid
+// stale values across requests (Workers reuse the isolate between invocations).
+const _tsCache = new Map();
+function parseTs(s) {
+  if (!s) return null;
+  let v = _tsCache.get(s);
+  if (v === undefined) { const t = new Date(s).getTime(); v = isNaN(t) ? null : t; _tsCache.set(s, v); }
+  return v;
+}
+
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -1023,20 +1033,31 @@ export default {
       const key = env.IDFM_API_KEY;
       if (!key) return json({ error: 'IDFM_API_KEY secret not set' }, 500);
 
-      // Cache the decoded JSON for 20s — parsing 800+ PRIM journeys per-request
-      // was causing intermittent CPU-limit 503s (same issue as NYC before w3.5).
-      const cache    = caches.default;
-      const cacheKey = new Request(request.url);
-      const hit      = await cache.match(cacheKey);
+      // Two-tier cache: 60s fresh key + 300s stale-fallback key.
+      // On thundering herd (cache miss) the compute may hit the 10ms CPU limit;
+      // the stale key lets us serve the last good response instead of a 503.
+      const cache     = caches.default;
+      const cacheKey  = new Request(request.url);
+      const staleKey  = new Request(request.url + '__stale');
+      const hit = await cache.match(cacheKey);
       if (hit) return hit;
 
+      _tsCache.clear(); // reset memo for this compute cycle
       try {
         const trains = await fetchParisTrains(key);
         const resp   = json({ city:'paris', count:trains.length, updatedAt:new Date().toISOString(), trains });
-        resp.headers.append('Cache-Control', 'public, max-age=20');
-        ctx.waitUntil(cache.put(cacheKey, resp.clone()));
+        resp.headers.append('Cache-Control', 'public, max-age=60');
+        const staleResp = resp.clone();
+        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        ctx.waitUntil(Promise.all([
+          cache.put(cacheKey, resp.clone()),
+          cache.put(staleKey, staleResp),
+        ]));
         return resp;
       } catch (e) {
+        // Serve stale on failure (thundering herd / CPU limit / PRIM outage)
+        const stale = await cache.match(staleKey);
+        if (stale) return stale;
         return json({ error: e.message }, 500);
       }
     }
@@ -1110,18 +1131,18 @@ function lookupParisStopById(ref) {
 // Returns {lat, lng, bearing, seg} or null.
 // seg = { aLat, aLng, tDep, bLat, bLng, tArr } — absolute UTC ms timestamps.
 function interpolateParisPosition(calls, now) {
-  const ms = s => { if (!s) return null; const t = new Date(s).getTime(); return isNaN(t) ? null : t; };
   const coordsOf = call => {
     const ref = call?.StopPointRef?.value ?? call?.StopPointRef ?? '';
     return lookupParisStopById(ref);
   };
+  const dep = c => parseTs(c.ExpectedDepartureTime) ?? parseTs(c.AimedDepartureTime)
+                ?? parseTs(c.ExpectedArrivalTime)   ?? parseTs(c.AimedArrivalTime);
 
   // Walk pairs of consecutive stops looking for the segment containing `now`
   for (let i = 0; i < calls.length - 1; i++) {
     const a = calls[i], b = calls[i + 1];
-    const tDep = ms(a.ExpectedDepartureTime) ?? ms(a.AimedDepartureTime)
-              ?? ms(a.ExpectedArrivalTime)   ?? ms(a.AimedArrivalTime);
-    const tArr = ms(b.ExpectedArrivalTime) ?? ms(b.AimedArrivalTime);
+    const tDep = dep(a);
+    const tArr = parseTs(b.ExpectedArrivalTime) ?? parseTs(b.AimedArrivalTime);
     if (!tDep || !tArr || tArr <= tDep) continue;
     if (tArr - tDep > 180000) continue; // skip multi-station gaps > 3 min
 
@@ -1134,33 +1155,29 @@ function interpolateParisPosition(calls, now) {
       const lat = cA[0] + t * (cB[0] - cA[0]);
       const lng = cA[1] + t * (cB[1] - cA[1]);
       const bearing = Math.round(Math.atan2(cB[1] - cA[1], cB[0] - cA[0]) * 180 / Math.PI);
-      // Return the segment so the client can drive animation from its own clock
       return { lat, lng, bearing,
                seg: { aLat: cA[0], aLng: cA[1], tDep, bLat: cB[0], bLng: cB[1], tArr } };
     }
   }
 
-  // No active between-stop segment — train is approaching or waiting at calls[0].
-  // Build a forward segment from calls[i] → calls[i+1] so the client can animate
-  // automatically the moment tDep passes, without needing another fetch.
-  // Cap at 180s: PRIM sometimes skips intermediate stops, producing 5-10 minute
-  // "segments" that span multiple real stations — those make trains look frozen.
-  for (let i = 0; i < calls.length - 1; i++) {
-    const a = calls[i], b = calls[i + 1];
-    const tDep = ms(a.ExpectedDepartureTime) ?? ms(a.AimedDepartureTime)
-              ?? ms(a.ExpectedArrivalTime)   ?? ms(a.AimedArrivalTime);
-    const tArr = ms(b.ExpectedArrivalTime) ?? ms(b.AimedArrivalTime);
-    if (!tDep || !tArr || tArr <= tDep) continue;
-    if (tArr - tDep > 180000) continue; // skip multi-station gaps > 3 min
-    const cA = coordsOf(a), cB = coordsOf(b);
-    if (!cA || !cB) continue;
-    const t = Math.max(0, Math.min(1, (now - tDep) / (tArr - tDep)));
-    return {
-      lat: cA[0] + t*(cB[0]-cA[0]),
-      lng: cA[1] + t*(cB[1]-cA[1]),
-      bearing: Math.round(Math.atan2(cB[1]-cA[1], cB[0]-cA[0]) * 180/Math.PI),
-      seg: { aLat: cA[0], aLng: cA[1], tDep, bLat: cB[0], bLng: cB[1], tArr },
-    };
+  // No active between-stop segment — use calls[0]→calls[1] as upcoming forward segment.
+  // Only check the first pair (O(1)); PRIM's first call is always the next stop.
+  if (calls.length >= 2) {
+    const a = calls[0], b = calls[1];
+    const tDep = dep(a);
+    const tArr = parseTs(b.ExpectedArrivalTime) ?? parseTs(b.AimedArrivalTime);
+    if (tDep && tArr && tArr > tDep && tArr - tDep <= 180000) {
+      const cA = coordsOf(a), cB = coordsOf(b);
+      if (cA && cB) {
+        const t = Math.max(0, Math.min(1, (now - tDep) / (tArr - tDep)));
+        return {
+          lat: cA[0] + t*(cB[0]-cA[0]),
+          lng: cA[1] + t*(cB[1]-cA[1]),
+          bearing: Math.round(Math.atan2(cB[1]-cA[1], cB[0]-cA[0]) * 180/Math.PI),
+          seg: { aLat: cA[0], aLng: cA[1], tDep, bLat: cB[0], bLng: cB[1], tArr },
+        };
+      }
+    }
   }
 
   // Absolute fallback — no usable stops at all

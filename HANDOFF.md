@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.2 (worker v3.7)  
+> **Prototype version:** v4.2 (worker w3.8)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -190,6 +190,50 @@ PRIM does not publish a GTFS-RT vehicle positions feed. The correct endpoint is 
 
 ---
 
+## Resuming This Work
+
+### Where things stand (2026-05-28 end of session)
+
+**Prototype:** v4.2 — Paris, NYC, Seattle polling live; Shinkansen timetable-driven; Tokyo simulated.  
+**Worker:** w3.8 — deployed `e1e74bbc`. All three live cities cache correctly. Paris no longer 503s.
+
+**What's working well:**
+- NYC: ~300–400 trains, protobuf decoded, cached 15s, fast (60ms warm)
+- Paris: ~800 trains, clock-driven animation using timetable segments (`seg` object), cached 60s fresh + 300s stale fallback — no more 503s under load
+- Shinkansen: 9 service types, clock-driven from JR schedule data, no API needed
+- On-screen fetch log panel (top-right) with per-city success/fail counters
+
+**Immediate next things to do (in priority order):**
+
+1. **Rotate the IDFM API key** — it was visible in earlier chat history. Go to https://prim.iledefrance-mobilites.fr → account → regenerate → `wrangler secret put IDFM_API_KEY`
+
+2. **Seattle live data** — just needs an OBA key. Email open_transit_data@soundtransit.org, then `wrangler secret put OBA_API_KEY`. Worker endpoint is already implemented at `/trains/seattle`.
+
+3. **Paris route accuracy** — trains animate correctly but positions don't snap to the metro lines because the route-constrained animation (`projectOnRouteT`) is only active for NYC/Seattle. Paris uses straight-line interpolation between stop coordinates. To fix: extend `stepTrains` clock-driven branch to also project onto the nearest Paris route polyline.
+
+4. **Paris line paths** — a Python generator script exists at `prototype/paris_routes_gen.py`. Run it and paste the output into the prototype to replace the hand-drawn route polylines with accurate IDFM coordinates.
+
+5. **More trains visible in Paris** — currently ~25% of journeys get a `seg` (usable timetable segment). The rest hit the "absolute fallback" (no valid calls). Investigate by hitting `/paris/debug` to see raw PRIM structure for a few trains; may need to look at more than 5 `EstimatedCall` entries per journey.
+
+6. **Tokyo live data** — ODPT API, free key at https://developer.odpt.org. Add `/trains/tokyo` worker endpoint.
+
+### Key technical context for next session
+
+**Paris animation — how it works:**
+Worker parses SIRI Lite `EstimatedCalls` per journey, finds the segment where `now` falls between `tDep` (stop A departure) and `tArr` (stop B arrival), returns `seg: {aLat,aLng,tDep,bLat,bLng,tArr}`. Client computes `t = (Date.now()-tDep)/(tArr-tDep)` and lerps. Works correctly even on stale cached responses because all timestamps are absolute UTC ms.
+
+**Paris 503 fix (w3.8) — what we did:**
+- `_tsCache` Map memoizes `new Date(s).getTime()` — reduced from ~24,000 allocations to near-zero per compute
+- Two-tier cache: 60s `cacheKey` + 300s `staleKey`; on failure the stale response is served
+- Fallback segment search is now O(1) (only checks calls[0]→calls[1])
+
+**Worker version history shortcuts:**
+- NYC was broken by CPU limit → fixed in w3.5 (Cache API + TextDecoder reuse)
+- Paris was broken by CPU limit → fixed in w3.8 (timestamp memo + stale fallback)
+- Both patterns: free-tier Workers has 10ms CPU limit; fix = cache aggressively and memoize expensive operations
+
+---
+
 ## Platform Build Plan
 
 | Track | Platforms | Stack | Status |
@@ -250,6 +294,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | w3.8 | Fix Paris intermittent 503 (thundering herd + CPU limit): (1) module-level timestamp memoization (_tsCache Map) cuts ~24,000 new Date() calls per compute to near-zero; (2) two-tier cache — 60s fresh key + 300s stale-fallback key; PRIM failure now serves last good response instead of 503; (3) fallback loop shortened from O(n) to O(1) by only checking calls[0]→calls[1]. 10/10 parallel requests return 200. Deployed e1e74bbc |
 | 2026-05-28 | v4.2 | Paris clock-driven animation: worker now returns timetable segment endpoints (aLat/aLng/tDep → bLat/bLng/tArr); client uses Date.now() to interpolate continuously — no velocity, no ID matching. Worker also returns upcoming segments (train departing soon) so 25% of trains have a segment vs 6% before. Cap at 180s filters PRIM multi-station gaps. Median segment 97s = correct Metro speed |
 | 2026-05-28 | w3.7 | Paris interpolation: worker returns seg {aLat,aLng,tDep,bLat,bLng,tArr} per train; fallback builds upcoming call[0]→call[1] segment so trains animate automatically when departure time passes; cap 180s filters multi-station PRIM gaps; calls slice 3→5 |
 | 2026-05-28 | v4.1 | Fetch stats panel: per-city success/fail counters (✓/✗ + %) displayed in fetch-log panel; resets at midnight (daily); skips don't count as attempts |
