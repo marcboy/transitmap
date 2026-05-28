@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v3.7 (worker v3.5)  
+> **Prototype version:** v3.8 (worker v3.5)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -250,6 +250,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v3.8 | Fix status pill showing stale data from previous city: switchCity() now immediately sets correct label per city type ("Connecting…" for live cities, "Simulated · Tokyo Metro" for Tokyo, kept Timetable for Shinkansen), and triggers an immediate fetch instead of waiting up to 15s |
 | 2026-05-28 | w3.5 | Fix NYC worker error 1102 (CPU limit): cache final decoded JSON via Cache API (15s TTL) so protobuf decode runs once per datacenter not per poll; reuse single TextDecoder; str() now zero-copy (subarray not slice); MTA feed cache TTL 10s→30s. Result: 363ms cold → 59ms warm |
 | 2026-05-28 | v3.7 | Fix fetching broken by AbortSignal.timeout() browser incompatibility: replaced with AbortController+setTimeout; added on-screen fetch log panel (top-right) showing timestamp, city, result, and duration for last 8 attempts |
 | 2026-05-28 | v3.6 | Fix frequent fetch failures: add _fetchInFlight guard (prevents overlapping polls), AbortSignal.timeout(12s) on prototype fetch, PRIM cache TTL 15s→30s, cap interpolation to first 3 calls per journey |

@@ -1263,8 +1263,14 @@ function switchCity(id, btn) {
       lastJapanUpdate = 0; // force refresh on next loop tick
       document.getElementById('statusLabel').textContent =
         `Timetable · ${trains.length} trains · JR Group · JST`;
+    } else if (id === 'nyc' || id === 'paris' || id === 'seattle') {
+      spawnTrains();
+      document.getElementById('statusLabel').textContent = 'Connecting…';
+      // Fetch immediately — don't make the user wait up to 15s for the next poll
+      fetchRealTrains();
     } else {
       spawnTrains();
+      document.getElementById('statusLabel').textContent = 'Simulated · Tokyo Metro';
     }
     renderLegend();
     if (id === 'seattle') fetchLiveDepartures(); else updateDepartures();
@@ -1282,7 +1288,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v3.7', LAST_EDIT='2026-05-28 · 23:10 PT'; // updated on every push
+const VERSION='v3.8', LAST_EDIT='2026-05-28 · 23:35 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();
