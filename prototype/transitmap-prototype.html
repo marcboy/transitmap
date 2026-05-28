@@ -1134,14 +1134,6 @@ async function fetchRealTrains() {
 
       const startLL = routeAtT(route.path, routeT) ?? [t.lat, t.lng];
 
-      // Pre-project segment endpoints onto the route polyline so stepTrains can
-      // interpolate along the track each frame without re-projecting every tick.
-      let segTA = null, segTB = null;
-      if (t.seg && route.path && route.path.length >= 2) {
-        segTA = projectOnRouteT(route.path, t.seg.aLat, t.seg.aLng);
-        segTB = projectOnRouteT(route.path, t.seg.bLat, t.seg.bLng);
-      }
-
       return {
         id:          t.id,
         route,
@@ -1149,8 +1141,6 @@ async function fetchRealTrains() {
         realLng:     t.lng,
         fetchTime,
         seg:         t.seg ?? null,
-        segTA,
-        segTB,
         routeT,
         routeSpeed,
         animLat:     startLL[0],
@@ -1212,6 +1202,26 @@ function projectOnRouteT(path, lat, lng) {
   return bestT;
 }
 
+// Snap [lat, lng] to the nearest point on a route polyline.
+// Returns the actual [lat, lng] of that nearest point.
+// Used for Paris clock-driven animation: interpolate between stops in lat/lng
+// space, then snap the result onto the track so the dot stays on the line.
+function snapToRoute(path, lat, lng) {
+  if (!path || path.length < 2) return [lat, lng];
+  let bestDist = Infinity, bestLat = lat, bestLng = lng;
+  for (let i = 0; i < path.length - 1; i++) {
+    const ax = path[i][0], ay = path[i][1];
+    const bx = path[i+1][0], by = path[i+1][1];
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx*dx + dy*dy;
+    const s = len2 > 0 ? Math.max(0, Math.min(1, ((lat-ax)*dx + (lng-ay)*dy) / len2)) : 0;
+    const nearLat = ax + s*dx, nearLng = ay + s*dy;
+    const dist = (lat-nearLat)**2 + (lng-nearLng)**2;
+    if (dist < bestDist) { bestDist = dist; bestLat = nearLat; bestLng = nearLng; }
+  }
+  return [bestLat, bestLng];
+}
+
 // Interpolate [lat, lng] from a route at t ∈ [0, 1]
 function routeAtT(path, t) {
   if (!path || path.length < 2) return null;
@@ -1240,15 +1250,18 @@ function stepTrains(dt) {
 
     if (tr.real) {
       if (tr.seg) {
+        // Clock-driven: interpolate in lat/lng between the two timetable stop
+        // coordinates, then snap the result onto the nearest point on the route
+        // polyline. Snapping avoids projection-to-T-value errors that caused
+        // trains to jump to wrong sections of symmetric or curved lines.
         const t = Math.max(0, Math.min(1, (Date.now() - tr.seg.tDep) / (tr.seg.tArr - tr.seg.tDep)));
-        if (tr.segTA !== null && tr.segTB !== null && tr.route.path && tr.route.path.length >= 2) {
-          // Route-constrained: move along the route polyline between the two projected stop positions.
-          const ll = routeAtT(tr.route.path, tr.segTA + t * (tr.segTB - tr.segTA));
-          if (ll) { tr.animLat = ll[0]; tr.animLng = ll[1]; }
+        const iLat = tr.seg.aLat + t * (tr.seg.bLat - tr.seg.aLat);
+        const iLng = tr.seg.aLng + t * (tr.seg.bLng - tr.seg.aLng);
+        if (tr.route.path && tr.route.path.length >= 2) {
+          const ll = snapToRoute(tr.route.path, iLat, iLng);
+          tr.animLat = ll[0]; tr.animLng = ll[1];
         } else {
-          // No route path — straight-line fallback between stop coordinates.
-          tr.animLat = tr.seg.aLat + t * (tr.seg.bLat - tr.seg.aLat);
-          tr.animLng = tr.seg.aLng + t * (tr.seg.bLng - tr.seg.aLng);
+          tr.animLat = iLat; tr.animLng = iLng;
         }
       } else if (tr.route.path && tr.route.path.length >= 2 && tr.routeSpeed !== 0) {
         // NYC/Seattle: route-constrained animation driven by measured speed between fetches.
@@ -1397,7 +1410,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.3', LAST_EDIT='2026-05-28 · 15:38 PT'; // updated on every push
+const VERSION='v4.4', LAST_EDIT='2026-05-28 · 15:50 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();
