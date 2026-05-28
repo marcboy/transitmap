@@ -1001,7 +1001,7 @@ function switchCity(id, btn) {
       spawnTrains();
     }
     renderLegend();
-    updateDepartures();
+    if (id === 'seattle') fetchLiveDepartures(); else updateDepartures();
     document.querySelectorAll('.city-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     setTimeout(() => cover.classList.remove('active'), 380);
@@ -1016,7 +1016,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v3.3', LAST_EDIT='2026-05-28 · 20:45 PT'; // updated on every push
+const VERSION='v3.4', LAST_EDIT='2026-05-28 · 21:10 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();
@@ -1085,34 +1085,39 @@ function closeAd() {
 }
 
 // ── SOUTH BELLEVUE DEPARTURE BOARD (2 Line Westbound) ─────────
-// Generates scheduled departures anchored to Sound Transit 2 Line
-// timetable: first departure ~5:07 AM PT, 24-min off-peak headway,
-// 12-min peak headway (M-F 6–9 AM and 3–7 PM).
-function computeSouthBellevueDepartures() {
+let _sbDeps = null; // cached live data: [{depMs, predicted}] or null
+
+// Schedule fallback — Sound Transit 2 Line timetable-derived times as ms timestamps.
+// 12-min peak (M-F 6–9 AM, 3–7 PM PT), 24-min otherwise. First train ~5:07 AM.
+function sbScheduleDeps() {
   const pt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
   const dayMin = pt.getHours() * 60 + pt.getMinutes();
   const isWeekend = pt.getDay() === 0 || pt.getDay() === 6;
+  const midnightPT = new Date(pt); midnightPT.setHours(0,0,0,0);
 
   const deps = [];
-  let t = 307; // 5:07 AM first departure (minutes from midnight)
-  while (t <= 24 * 60 + 20) { // service ends ~12:20 AM next day
+  let t = 307;
+  while (t <= 24 * 60 + 20) {
     deps.push(t);
     const inAMPeak = !isWeekend && t >= 360 && t < 540;
     const inPMPeak = !isWeekend && t >= 900 && t < 1140;
     t += (inAMPeak || inPMPeak) ? 12 : 24;
   }
+  return deps.filter(d => d > dayMin).slice(0, 4).map(d => ({
+    depMs: midnightPT.getTime() + (d % (24*60)) * 60000,
+    predicted: false,
+  }));
+}
 
-  // Next 4 departures strictly after now
-  return deps.filter(d => d > dayMin).slice(0, 4).map(d => {
-    const normD = d % (24 * 60);
-    const h = Math.floor(normD / 60);
-    const m = normD % 60;
-    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    return {
-      time: `${h12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`,
-      minUntil: d - dayMin,
-    };
-  });
+async function fetchLiveDepartures() {
+  if (!WORKER_URL || cityId !== 'seattle') return;
+  try {
+    const resp = await fetch(`${WORKER_URL}/departures/south-bellevue`);
+    if (!resp.ok) throw new Error('no data');
+    const data = await resp.json();
+    _sbDeps = (data.departures && data.departures.length) ? data.departures : null;
+  } catch { _sbDeps = null; }
+  updateDepartures();
 }
 
 function updateDepartures() {
@@ -1120,17 +1125,26 @@ function updateDepartures() {
   if (cityId !== 'seattle') { panel.classList.remove('visible'); return; }
   panel.classList.add('visible');
 
-  const deps = computeSouthBellevueDepartures();
+  const now = Date.now();
+  let deps = _sbDeps ? _sbDeps.filter(d => d.depMs > now - 60000).slice(0, 4) : null;
+  const isLive = deps && deps.some(d => d.predicted);
+  if (!deps || !deps.length) deps = sbScheduleDeps();
+
+  document.querySelector('.dep-source').textContent = isLive ? 'Live · Sound Transit' : 'Scheduled';
+
   const rows = document.getElementById('dep-rows');
   if (!deps.length) {
     rows.innerHTML = '<div class="dep-row"><span class="dep-dest" style="color:rgba(255,255,255,0.4)">No more service today</span></div>';
     return;
   }
   rows.innerHTML = deps.map(d => {
-    const minText = d.minUntil <= 1 ? 'Now' : `${d.minUntil} min`;
-    const soonClass = d.minUntil <= 3 ? ' soon' : '';
+    const minUntil = Math.round((d.depMs - now) / 60000);
+    const timeStr = new Date(d.depMs).toLocaleTimeString('en-US',
+      { hour:'numeric', minute:'2-digit', timeZone:'America/Los_Angeles' });
+    const minText = minUntil <= 1 ? 'Now' : `${minUntil} min`;
+    const soonClass = minUntil <= 3 ? ' soon' : '';
     return `<div class="dep-row">
-      <span class="dep-time">${d.time}</span>
+      <span class="dep-time">${timeStr}</span>
       <span class="dep-min${soonClass}">${minText}</span>
       <span class="dep-dest">Westlake</span>
     </div>`;
@@ -1145,6 +1159,7 @@ tick();
 setInterval(tick, 1000);
 scheduleAd();
 startRealDataPolling();
+setInterval(fetchLiveDepartures, 45000);
 setTimeout(() => {
   if (!isLive) document.getElementById('statusLabel').textContent =
     WORKER_URL ? 'Connecting to MTA…' : 'Simulated · Deploy worker for live data (no API key needed)';

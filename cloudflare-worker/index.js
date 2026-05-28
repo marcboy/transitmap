@@ -1055,6 +1055,17 @@ if (path === '/trains/seattle') {
       }
     }
 
+    if (path === '/departures/south-bellevue') {
+      const key = env.OBA_API_KEY;
+      if (!key) return json({ error: 'OBA_API_KEY not set' }, 500);
+      try {
+        const deps = await fetchSouthBellevueDepartures(key);
+        return json({ stop:'South Bellevue', route:'2 Line', direction:'Westbound', updatedAt:new Date().toISOString(), departures:deps });
+      } catch(e) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
     return json({ error:'Not found. Try /trains/nyc, /trains/seattle, or /health' }, 404);
   }
 };
@@ -1154,6 +1165,33 @@ async function fetchSeattleTrains(apiKey) {
   }
 
   return trains;
+}
+
+// ── South Bellevue arrivals (2 Line westbound, OBA) ──────────
+async function fetchSouthBellevueDepartures(apiKey) {
+  const url = `https://api.pugetsound.onebusaway.org/api/where/arrivals-and-departures-for-stop/40_E09-T2.json?key=${apiKey}&minutesAfter=90&minutesBefore=0&includePolylines=false`;
+  const resp = await withTimeout(fetch(url, { cf:{ cacheTtl:20, cacheEverything:true } }), 8000);
+  if (!resp.ok) throw new Error(`OBA ${resp.status}`);
+  const body = await resp.json();
+
+  const entries = body?.data?.entry?.arrivalsAndDepartures ?? [];
+  const now = Date.now();
+
+  return entries
+    .filter(a => (a.tripHeadsign ?? '').toLowerCase().includes('westlake'))
+    .filter(a => {
+      const depMs = a.predictedDepartureTime > 0 ? a.predictedDepartureTime : a.scheduledDepartureTime;
+      return depMs > now;
+    })
+    .slice(0, 4)
+    .map(a => {
+      const predicted = a.predictedDepartureTime > 0;
+      return {
+        depMs:     predicted ? a.predictedDepartureTime : a.scheduledDepartureTime,
+        predicted,
+        headsign:  a.tripHeadsign ?? 'Westlake',
+      };
+    });
 }
 
 // ── Fetch all MTA feeds concurrently ─────────────────────────
