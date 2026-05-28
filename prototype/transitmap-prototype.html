@@ -908,7 +908,7 @@ function computeShinkansenTrains() {
         real:      true,
         realLat:   pos.lat, realLng: pos.lng,
         animLat:   pos.lat, animLng: pos.lng,
-        fetchTime: 0, velLat: 0, velLng: 0, // timetable position; no dead-reckoning needed
+        fetchTime: 0, routeT: 0, routeSpeed: 0, // timetable position; animation driven by computeShinkansenTrains
         status:    'MOVE',
         stopMs:    0,
         phase,
@@ -1049,15 +1049,14 @@ async function fetchRealTrains() {
     const city   = CITIES[fetchedCity];
     const agency = fetchedCity === 'nyc' ? 'MTA' : fetchedCity === 'paris' ? 'RATP' : 'Sound Transit';
 
-    // Build a lookup from the previous fetch: store actual reported positions
-    // (not animated) so velocity calculation is based on real movement, not
-    // interpolated display positions.
+    // Build a lookup from the previous fetch.
     const prevPos = {};
     const fetchTime = Date.now();
     trains.forEach(tr => {
       if (tr.real && tr.id) prevPos[tr.id] = {
         lat: tr.realLat, lng: tr.realLng,
         fetchTime: tr.fetchTime,
+        routeT: tr.routeT,
       };
     });
 
@@ -1066,38 +1065,41 @@ async function fetchRealTrains() {
                  ?? { id: t.line, color: t.color, path: [] };
       const prev = prevPos[t.id];
 
-      // Distance guard: if the previous position is more than ~0.05° away (≈5 km)
-      // treat this as a new/reused ID and start fresh with no velocity.
       const tooFar = prev &&
         (Math.abs(prev.lat - t.lat) + Math.abs(prev.lng - t.lng)) > 0.05;
       const hasPrev = prev && !tooFar && prev.fetchTime > 0;
 
-      // Dead-reckoning velocity: how fast did this train move between the last two
-      // successful fetches? We'll continue extrapolating at this rate until the next
-      // fetch arrives with a corrected position.
-      let velLat = 0, velLng = 0;
-      if (hasPrev) {
+      // Project the reported position onto the route polyline.
+      // This snaps the train to the track and gives us a 1-D position (routeT ∈ [0,1])
+      // we can advance frame-by-frame without the train ever drifting off the line.
+      const routeT = projectOnRouteT(route.path, t.lat, t.lng);
+
+      // Speed: how much routeT changed per ms between the last two fetches.
+      // Positive = towards end of route, negative = towards start (reverse direction).
+      let routeSpeed = 0;
+      if (hasPrev && prev.routeT !== undefined) {
         const dtMs = fetchTime - prev.fetchTime;
-        if (dtMs > 500 && dtMs < 120000) { // sane interval: 0.5s–2min
-          velLat = (t.lat - prev.lat) / dtMs;
-          velLng = (t.lng - prev.lng) / dtMs;
+        if (dtMs > 500 && dtMs < 120000) {
+          routeSpeed = (routeT - prev.routeT) / dtMs;
         }
       }
 
+      const startLL = routeAtT(route.path, routeT) ?? [t.lat, t.lng];
+
       return {
-        id:        t.id,
+        id:          t.id,
         route,
-        realLat:   t.lat,
-        realLng:   t.lng,
+        realLat:     t.lat,
+        realLng:     t.lng,
         fetchTime,
-        velLat,
-        velLng,
-        animLat:   t.lat,
-        animLng:   t.lng,
-        status:    t.status === 'AT_STOP' ? 'STOP' : 'MOVE',
-        stopMs:    0,
-        phase:     Math.random() * Math.PI * 2,
-        real:      true,
+        routeT,
+        routeSpeed,
+        animLat:     startLL[0],
+        animLng:     startLL[1],
+        status:      t.status === 'AT_STOP' ? 'STOP' : 'MOVE',
+        stopMs:      0,
+        phase:       Math.random() * Math.PI * 2,
+        real:        true,
       };
     });
 
@@ -1134,6 +1136,33 @@ function syncCount() {
   document.getElementById('trainCountInline').textContent = trains.length;
 }
 
+// Project [lat, lng] onto the nearest point of a route polyline.
+// Returns t ∈ [0, 1] using index parameterisation (0=first stop, 1=last stop).
+function projectOnRouteT(path, lat, lng) {
+  if (!path || path.length < 2) return 0;
+  let bestDist = Infinity, bestT = 0;
+  for (let i = 0; i < path.length - 1; i++) {
+    const ax = path[i][0], ay = path[i][1];
+    const bx = path[i+1][0], by = path[i+1][1];
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx*dx + dy*dy;
+    const s = len2 > 0 ? Math.max(0, Math.min(1, ((lat-ax)*dx + (lng-ay)*dy) / len2)) : 0;
+    const dist = (lat - ax - s*dx)**2 + (lng - ay - s*dy)**2;
+    if (dist < bestDist) { bestDist = dist; bestT = (i + s) / (path.length - 1); }
+  }
+  return bestT;
+}
+
+// Interpolate [lat, lng] from a route at t ∈ [0, 1]
+function routeAtT(path, t) {
+  if (!path || path.length < 2) return null;
+  const pos = t * (path.length - 1);
+  const i   = Math.min(Math.floor(pos), path.length - 2);
+  const f   = pos - i;
+  return [path[i][0] + f*(path[i+1][0]-path[i][0]),
+          path[i][1] + f*(path[i+1][1]-path[i][1])];
+}
+
 // Returns [lat, lng] — real reported position or simulated interpolation
 function trainLatLng(tr) {
   if (tr.real) return [tr.animLat ?? tr.realLat, tr.animLng ?? tr.realLng];
@@ -1151,14 +1180,16 @@ function stepTrains(dt) {
     tr.phase += 0.05;
 
     if (tr.real) {
-      // Dead-reckoning: extrapolate forward from the last reported position at the
-      // velocity measured between the two most recent successful fetches.
-      // This keeps trains moving continuously instead of freezing after each fetch.
-      // Cap at 120s so a stale train doesn't drift off the map indefinitely.
-      const elapsed = Date.now() - tr.fetchTime;
-      const t = Math.min(elapsed, 120000);
-      tr.animLat = tr.realLat + tr.velLat * t;
-      tr.animLng = tr.realLng + tr.velLng * t;
+      const hasRoute = tr.route.path && tr.route.path.length >= 2;
+      if (hasRoute && tr.routeSpeed !== 0) {
+        // Advance along the route polyline at the speed measured between the last
+        // two fetches. Trains always stay on their track — no drifting off the line.
+        // Clamp at [0, 1]: trains that reach a terminus stop there until new data.
+        tr.routeT = Math.max(0, Math.min(1, tr.routeT + tr.routeSpeed * dt));
+        const ll = routeAtT(tr.route.path, tr.routeT);
+        if (ll) { tr.animLat = ll[0]; tr.animLng = ll[1]; }
+      }
+      // If routeSpeed is 0 (first fetch, or truly stopped) the train stays put.
 
       if (tr.status === 'STOP') {
         tr.stopMs += dt;
@@ -1300,7 +1331,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v3.9', LAST_EDIT='2026-05-29 · 00:00 PT'; // updated on every push
+const VERSION='v4.0', LAST_EDIT='2026-05-29 · 00:30 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();
