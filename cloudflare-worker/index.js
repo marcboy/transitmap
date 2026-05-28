@@ -1010,21 +1010,30 @@ export default {
 
 
     if (path === '/trains/nyc') {
-      // Cache the fully-decoded JSON response for 15s.
-      // Protobuf decode of 8 concurrent feeds is CPU-heavy; without this every
-      // poll re-runs the full decode and hits the Workers CPU time limit (1102).
+      // Two-tier cache: 30s fresh + 300s stale fallback.
+      // Protobuf decode of 8 MTA feeds is CPU-heavy; if cache expires and compute
+      // fails (CPU limit 1102), serve stale rather than letting the failure loop
+      // self-reinforce (failed compute → cache never populated → next miss → loop).
       const cache    = caches.default;
       const cacheKey = new Request(request.url);
+      const staleKey = new Request(request.url + '__stale');
       const hit      = await cache.match(cacheKey);
       if (hit) return hit;
 
       try {
         const trains = await fetchAllMTATrains();
-        const resp   = json({ city:'nyc', count:trains.length, updatedAt:new Date().toISOString(), trains });
-        resp.headers.append('Cache-Control', 'public, max-age=15');
-        ctx.waitUntil(cache.put(cacheKey, resp.clone()));
+        const resp      = json({ city:'nyc', count:trains.length, updatedAt:new Date().toISOString(), trains });
+        resp.headers.append('Cache-Control', 'public, max-age=30');
+        const staleResp = resp.clone();
+        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        ctx.waitUntil(Promise.all([
+          cache.put(cacheKey, resp.clone()),
+          cache.put(staleKey, staleResp),
+        ]));
         return resp;
       } catch (e) {
+        const stale = await cache.match(staleKey);
+        if (stale) return stale;
         return json({ error: e.message }, 500);
       }
     }
