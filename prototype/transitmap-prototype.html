@@ -66,6 +66,19 @@
   .ad-divider.visible { transform:scaleX(1); }
   .fade-cover { position:absolute; inset:0; background:var(--bg); z-index:700; opacity:0; pointer-events:none; transition:opacity 0.35s ease; }
   .fade-cover.active { opacity:1; }
+
+  #departures-panel { position:absolute; bottom:90px; left:32px; z-index:500; background:rgba(8,12,20,0.82); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:14px 18px; backdrop-filter:blur(12px); min-width:270px; display:none; }
+  #departures-panel.visible { display:block; }
+  .ad-active-ui #departures-panel { display:none!important; }
+  .dep-header { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.45); margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+  .dep-line-dot { width:8px; height:8px; border-radius:50%; background:#0091DA; box-shadow:0 0 6px #0091DA88; flex-shrink:0; }
+  .dep-row { display:flex; align-items:center; gap:0; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.07); }
+  .dep-row:last-child { border-bottom:none; }
+  .dep-time { font-size:13px; color:#fff; font-weight:500; width:82px; }
+  .dep-min { font-size:11px; color:rgba(255,255,255,0.5); width:58px; }
+  .dep-min.soon { color:#4ade80; }
+  .dep-dest { font-size:11px; color:rgba(255,255,255,0.65); }
+  .dep-source { font-size:9px; letter-spacing:1.5px; color:rgba(255,255,255,0.28); margin-top:9px; text-align:right; text-transform:uppercase; }
 </style>
 </head>
 <body>
@@ -121,6 +134,12 @@
   </div>
 </div>
 <div class="fade-cover" id="fadeCover"></div>
+
+<div id="departures-panel">
+  <div class="dep-header"><div class="dep-line-dot"></div>2 Line &middot; South Bellevue &rarr; Westlake</div>
+  <div id="dep-rows"></div>
+  <div class="dep-source">Scheduled</div>
+</div>
 
 <script>
 const CITIES = {
@@ -982,6 +1001,7 @@ function switchCity(id, btn) {
       spawnTrains();
     }
     renderLegend();
+    updateDepartures();
     document.querySelectorAll('.city-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     setTimeout(() => cover.classList.remove('active'), 380);
@@ -996,17 +1016,18 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v3.2', LAST_EDIT='2026-05-28 · 20:30 PT'; // updated on every push
+const VERSION='v3.3', LAST_EDIT='2026-05-28 · 20:45 PT'; // updated on every push
+let _lastDepMin = -1;
 function tick() {
   const n=new Date();
-  const hh=String(n.getHours()).padStart(2,'0');
-  const mm=String(n.getMinutes()).padStart(2,'0');
-  const ss=String(n.getSeconds()).padStart(2,'0');
   document.getElementById('versionStamp').textContent=`${VERSION} · built ${LAST_EDIT}`;
   const tz = CITIES[cityId]?.timezone ?? 'UTC';
   const localStr = n.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric', timeZone: tz })
     + ' · ' + n.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', timeZone: tz });
   document.getElementById('localTime').textContent = localStr;
+  // Refresh departure board every minute
+  const curMin = n.getMinutes();
+  if (curMin !== _lastDepMin) { _lastDepMin = curMin; updateDepartures(); }
 }
 
 // ── ADS ───────────────────────────────────────────────────────
@@ -1061,6 +1082,59 @@ function closeAd() {
   }, 620); // wait for panel slide-out (0.6s) before expanding map
 
   scheduleAd();
+}
+
+// ── SOUTH BELLEVUE DEPARTURE BOARD (2 Line Westbound) ─────────
+// Generates scheduled departures anchored to Sound Transit 2 Line
+// timetable: first departure ~5:07 AM PT, 24-min off-peak headway,
+// 12-min peak headway (M-F 6–9 AM and 3–7 PM).
+function computeSouthBellevueDepartures() {
+  const pt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  const dayMin = pt.getHours() * 60 + pt.getMinutes();
+  const isWeekend = pt.getDay() === 0 || pt.getDay() === 6;
+
+  const deps = [];
+  let t = 307; // 5:07 AM first departure (minutes from midnight)
+  while (t <= 24 * 60 + 20) { // service ends ~12:20 AM next day
+    deps.push(t);
+    const inAMPeak = !isWeekend && t >= 360 && t < 540;
+    const inPMPeak = !isWeekend && t >= 900 && t < 1140;
+    t += (inAMPeak || inPMPeak) ? 12 : 24;
+  }
+
+  // Next 4 departures strictly after now
+  return deps.filter(d => d > dayMin).slice(0, 4).map(d => {
+    const normD = d % (24 * 60);
+    const h = Math.floor(normD / 60);
+    const m = normD % 60;
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return {
+      time: `${h12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`,
+      minUntil: d - dayMin,
+    };
+  });
+}
+
+function updateDepartures() {
+  const panel = document.getElementById('departures-panel');
+  if (cityId !== 'seattle') { panel.classList.remove('visible'); return; }
+  panel.classList.add('visible');
+
+  const deps = computeSouthBellevueDepartures();
+  const rows = document.getElementById('dep-rows');
+  if (!deps.length) {
+    rows.innerHTML = '<div class="dep-row"><span class="dep-dest" style="color:rgba(255,255,255,0.4)">No more service today</span></div>';
+    return;
+  }
+  rows.innerHTML = deps.map(d => {
+    const minText = d.minUntil <= 1 ? 'Now' : `${d.minUntil} min`;
+    const soonClass = d.minUntil <= 3 ? ' soon' : '';
+    return `<div class="dep-row">
+      <span class="dep-time">${d.time}</span>
+      <span class="dep-min${soonClass}">${minText}</span>
+      <span class="dep-dest">Westlake</span>
+    </div>`;
+  }).join('');
 }
 
 // ── INIT ──────────────────────────────────────────────────────

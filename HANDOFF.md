@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v3.2 (worker v3.1)  
+> **Prototype version:** v3.3 (worker v3.1)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -250,6 +250,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v3.3 | Seattle pane: departure board (bottom-left) showing next 4 trains from South Bellevue → Westlake on 2 Line; clock-driven from Sound Transit schedule (12-min peak / 24-min off-peak); updates every minute; hidden on other city panes |
 | 2026-05-28 | v3.2 | Fix M11 and M14 route paths: M11 adds Jourdain + 3 eastern extension stations (Montreuil-Hôpital, La Dhuys, Rosny-Bois-Perrier); M14 adds 4 southern extension stations (Villejuif-Gustave Roussy, Hôpital Bicêtre, Maison Blanche, Olympiades) bridging the gap to L'Haÿ-les-Roses |
 | 2026-05-28 | v3.1 | Paris live data working: switched from non-existent GTFS-RT feed to PRIM SIRI Lite estimated-timetable; 805-stop ID lookup table; correct STIF line IDs; ~850 trains live |
 | 2026-05-28 | v3.0 | Paris Metro routes rebuilt from official IDFM station coordinates — all 16 lines accurate (M1–M14, M3b, M7b), replacing hand-crafted approximations off by up to ~800m |
