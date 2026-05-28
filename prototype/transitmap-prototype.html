@@ -1134,13 +1134,23 @@ async function fetchRealTrains() {
 
       const startLL = routeAtT(route.path, routeT) ?? [t.lat, t.lng];
 
+      // Pre-project segment endpoints onto the route polyline so stepTrains can
+      // interpolate along the track each frame without re-projecting every tick.
+      let segTA = null, segTB = null;
+      if (t.seg && route.path && route.path.length >= 2) {
+        segTA = projectOnRouteT(route.path, t.seg.aLat, t.seg.aLng);
+        segTB = projectOnRouteT(route.path, t.seg.bLat, t.seg.bLng);
+      }
+
       return {
         id:          t.id,
         route,
         realLat:     t.lat,
         realLng:     t.lng,
         fetchTime,
-        seg:         t.seg ?? null,   // clock-driven segment (Paris); null for NYC/Seattle
+        seg:         t.seg ?? null,
+        segTA,
+        segTB,
         routeT,
         routeSpeed,
         animLat:     startLL[0],
@@ -1230,17 +1240,18 @@ function stepTrains(dt) {
 
     if (tr.real) {
       if (tr.seg) {
-        // Clock-driven: interpolate between two timetable stops using Date.now().
-        // t<0 (before departure) → train waits at stop A.
-        // 0≤t≤1 (in transit)   → train moves smoothly to stop B.
-        // t>1 (segment expired) → train waits at stop B until next fetch.
-        // The segment timestamps are absolute UTC ms so cached responses still
-        // produce correct positions — no staleness problem.
         const t = Math.max(0, Math.min(1, (Date.now() - tr.seg.tDep) / (tr.seg.tArr - tr.seg.tDep)));
-        tr.animLat = tr.seg.aLat + t * (tr.seg.bLat - tr.seg.aLat);
-        tr.animLng = tr.seg.aLng + t * (tr.seg.bLng - tr.seg.aLng);
+        if (tr.segTA !== null && tr.segTB !== null && tr.route.path && tr.route.path.length >= 2) {
+          // Route-constrained: move along the route polyline between the two projected stop positions.
+          const ll = routeAtT(tr.route.path, tr.segTA + t * (tr.segTB - tr.segTA));
+          if (ll) { tr.animLat = ll[0]; tr.animLng = ll[1]; }
+        } else {
+          // No route path — straight-line fallback between stop coordinates.
+          tr.animLat = tr.seg.aLat + t * (tr.seg.bLat - tr.seg.aLat);
+          tr.animLng = tr.seg.aLng + t * (tr.seg.bLng - tr.seg.aLng);
+        }
       } else if (tr.route.path && tr.route.path.length >= 2 && tr.routeSpeed !== 0) {
-        // Fallback for cities without segment data (NYC/Seattle): route-constrained animation
+        // NYC/Seattle: route-constrained animation driven by measured speed between fetches.
         tr.routeT = Math.max(0, Math.min(1, tr.routeT + tr.routeSpeed * dt));
         const ll = routeAtT(tr.route.path, tr.routeT);
         if (ll) { tr.animLat = ll[0]; tr.animLng = ll[1]; }
@@ -1386,7 +1397,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.2', LAST_EDIT='2026-05-29 · 02:00 PT'; // updated on every push
+const VERSION='v4.3', LAST_EDIT='2026-05-28 · 17:00 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();
