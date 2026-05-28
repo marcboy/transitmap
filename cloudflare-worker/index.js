@@ -15,6 +15,8 @@ function parseTs(s) {
   return v;
 }
 
+const WORKER_VERSION = 'w4.1';
+
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -1022,7 +1024,7 @@ export default {
 
       try {
         const trains = await fetchAllMTATrains();
-        const resp      = json({ city:'nyc', count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp      = json({ city:'nyc', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
         resp.headers.append('Cache-Control', 'public, max-age=30');
         const staleResp = resp.clone();
         staleResp.headers.set('Cache-Control', 'public, max-age=300');
@@ -1054,7 +1056,7 @@ export default {
       _tsCache.clear(); // reset memo for this compute cycle
       try {
         const trains = await fetchParisTrains(key);
-        const resp   = json({ city:'paris', count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp   = json({ city:'paris', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
         resp.headers.append('Cache-Control', 'public, max-age=60');
         const staleResp = resp.clone();
         staleResp.headers.set('Cache-Control', 'public, max-age=300');
@@ -1101,7 +1103,7 @@ if (path === '/trains/seattle') {
       if (!key) return json({ error: 'OBA_API_KEY secret not set — run: wrangler secret put OBA_API_KEY' }, 500);
       try {
         const trains = await fetchSeattleTrains(key);
-        return json({ city:'seattle', count:trains.length, updatedAt:new Date().toISOString(), trains });
+        return json({ city:'seattle', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
       } catch (e) {
         return json({ error: e.message }, 500);
       }

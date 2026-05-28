@@ -131,6 +131,7 @@
   <div class="lines-row" id="linesRow"></div>
   <div>
     <div class="version-stamp" id="versionStamp">v1.3</div>
+    <div class="version-stamp" id="workerStamp" style="opacity:0.6"></div>
   </div>
 </div>
 
@@ -1164,6 +1165,10 @@ async function fetchRealTrains() {
     const ss  = String(now.getSeconds()).padStart(2,'0');
     document.getElementById('statusLabel').textContent =
       `Live · ${data.count} trains · ${agency} · updated ${hh}:${mm}:${ss}`;
+    if (data.workerVersion && data.updatedAt) {
+      document.getElementById('workerStamp').textContent =
+        `${data.workerVersion} · data ${toPT(data.updatedAt)} PT`;
+    }
     _logFetch(fetchedCity, 'ok', `${data.count} trains`, elapsed);
 
   } catch (e) {
@@ -1410,7 +1415,16 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.4', LAST_EDIT='2026-05-28 · 15:50 PT'; // updated on every push
+const VERSION='v4.5', LAST_EDIT='2026-05-28 · 16:05 PT';
+
+function toPT(isoString) {
+  if (!isoString) return '—';
+  return new Date(isoString).toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).replace(',', ' ·');
+}
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();
