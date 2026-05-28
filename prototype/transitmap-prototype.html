@@ -903,15 +903,14 @@ function computeShinkansenTrains() {
       // deterministic phase so dots don't all pulse in sync
       const phase = ((dep * 31 + svc.lineId.charCodeAt(0) * 7) % 628) / 100;
       result.push({
-        id:      `shin-${svc.lineId}-${dep}-${svc.stops[0][0].toFixed(1)}`,
-        route:   { id: svc.lineId, color: svc.color, path: [] },
-        real:    true,
-        realLat: pos.lat, realLng: pos.lng,
-        animLat: pos.lat, animLng: pos.lng,
-        prevLat: pos.lat, prevLng: pos.lng,
-        lerpT:   1,
-        status:  'MOVE',
-        stopMs:  0,
+        id:        `shin-${svc.lineId}-${dep}-${svc.stops[0][0].toFixed(1)}`,
+        route:     { id: svc.lineId, color: svc.color, path: [] },
+        real:      true,
+        realLat:   pos.lat, realLng: pos.lng,
+        animLat:   pos.lat, animLng: pos.lng,
+        fetchTime: 0, velLat: 0, velLng: 0, // timetable position; no dead-reckoning needed
+        status:    'MOVE',
+        stopMs:    0,
         phase,
       });
     }
@@ -1050,10 +1049,16 @@ async function fetchRealTrains() {
     const city   = CITIES[fetchedCity];
     const agency = fetchedCity === 'nyc' ? 'MTA' : fetchedCity === 'paris' ? 'RATP' : 'Sound Transit';
 
-    // Build a lookup of existing train positions for smooth lerp
+    // Build a lookup from the previous fetch: store actual reported positions
+    // (not animated) so velocity calculation is based on real movement, not
+    // interpolated display positions.
     const prevPos = {};
+    const fetchTime = Date.now();
     trains.forEach(tr => {
-      if (tr.real && tr.id) prevPos[tr.id] = { lat: tr.animLat ?? tr.realLat, lng: tr.animLng ?? tr.realLng };
+      if (tr.real && tr.id) prevPos[tr.id] = {
+        lat: tr.realLat, lng: tr.realLng,
+        fetchTime: tr.fetchTime,
+      };
     });
 
     const realTrains = data.trains.map(t => {
@@ -1061,29 +1066,38 @@ async function fetchRealTrains() {
                  ?? { id: t.line, color: t.color, path: [] };
       const prev = prevPos[t.id];
 
-      // Distance guard: MTA entity IDs are sequential feed numbers that change every
-      // snapshot — the same ID may refer to a completely different physical train on
-      // the next poll. If the "previous" position is more than ~0.05° away (≈5 km)
-      // from the newly reported position, assume ID reuse and jump immediately
-      // instead of lerping a train across half the city.
+      // Distance guard: if the previous position is more than ~0.05° away (≈5 km)
+      // treat this as a new/reused ID and start fresh with no velocity.
       const tooFar = prev &&
         (Math.abs(prev.lat - t.lat) + Math.abs(prev.lng - t.lng)) > 0.05;
-      const usePrev = prev && !tooFar;
+      const hasPrev = prev && !tooFar && prev.fetchTime > 0;
+
+      // Dead-reckoning velocity: how fast did this train move between the last two
+      // successful fetches? We'll continue extrapolating at this rate until the next
+      // fetch arrives with a corrected position.
+      let velLat = 0, velLng = 0;
+      if (hasPrev) {
+        const dtMs = fetchTime - prev.fetchTime;
+        if (dtMs > 500 && dtMs < 120000) { // sane interval: 0.5s–2min
+          velLat = (t.lat - prev.lat) / dtMs;
+          velLng = (t.lng - prev.lng) / dtMs;
+        }
+      }
 
       return {
-        id:      t.id,
+        id:        t.id,
         route,
-        realLat: t.lat,
-        realLng: t.lng,
-        prevLat: usePrev ? prev.lat : t.lat,
-        prevLng: usePrev ? prev.lng : t.lng,
-        animLat: usePrev ? prev.lat : t.lat,
-        animLng: usePrev ? prev.lng : t.lng,
-        lerpT:   usePrev ? 0 : 1,
-        status:  t.status === 'AT_STOP' ? 'STOP' : 'MOVE',
-        stopMs:  0,
-        phase:   Math.random() * Math.PI * 2,
-        real:    true,
+        realLat:   t.lat,
+        realLng:   t.lng,
+        fetchTime,
+        velLat,
+        velLng,
+        animLat:   t.lat,
+        animLng:   t.lng,
+        status:    t.status === 'AT_STOP' ? 'STOP' : 'MOVE',
+        stopMs:    0,
+        phase:     Math.random() * Math.PI * 2,
+        real:      true,
       };
     });
 
@@ -1137,16 +1151,14 @@ function stepTrains(dt) {
     tr.phase += 0.05;
 
     if (tr.real) {
-      // Smoothly lerp from last position to current reported position
-      // This gives fluid motion as trains move between 15s API updates
-      if (tr.prevLat !== undefined && tr.lerpT < 1) {
-        tr.lerpT = Math.min(1, tr.lerpT + dt / 15000); // complete over 15s
-        tr.animLat = tr.prevLat + (tr.realLat - tr.prevLat) * tr.lerpT;
-        tr.animLng = tr.prevLng + (tr.realLng - tr.prevLng) * tr.lerpT;
-      } else {
-        tr.animLat = tr.realLat;
-        tr.animLng = tr.realLng;
-      }
+      // Dead-reckoning: extrapolate forward from the last reported position at the
+      // velocity measured between the two most recent successful fetches.
+      // This keeps trains moving continuously instead of freezing after each fetch.
+      // Cap at 120s so a stale train doesn't drift off the map indefinitely.
+      const elapsed = Date.now() - tr.fetchTime;
+      const t = Math.min(elapsed, 120000);
+      tr.animLat = tr.realLat + tr.velLat * t;
+      tr.animLng = tr.realLng + tr.velLng * t;
 
       if (tr.status === 'STOP') {
         tr.stopMs += dt;
@@ -1288,7 +1300,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v3.8', LAST_EDIT='2026-05-28 · 23:35 PT'; // updated on every push
+const VERSION='v3.9', LAST_EDIT='2026-05-29 · 00:00 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();
