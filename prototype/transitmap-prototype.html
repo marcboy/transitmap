@@ -66,6 +66,14 @@
   .ad-divider.visible { transform:scaleX(1); }
   .fade-cover { position:absolute; inset:0; background:var(--bg); z-index:700; opacity:0; pointer-events:none; transition:opacity 0.35s ease; }
   .fade-cover.active { opacity:1; }
+  #fetch-log { position:absolute; top:80px; right:32px; z-index:501; background:rgba(4,8,16,0.92); border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:10px 14px; font-size:10px; font-family:'DM Mono',monospace; color:rgba(255,255,255,0.7); min-width:300px; max-width:420px; line-height:1.6; pointer-events:none; }
+  #fetch-log .fl-row { display:flex; gap:8px; border-bottom:1px solid rgba(255,255,255,0.06); padding:3px 0; }
+  #fetch-log .fl-row:last-child { border-bottom:none; }
+  #fetch-log .fl-ts  { color:rgba(255,255,255,0.35); flex-shrink:0; }
+  #fetch-log .fl-ok  { color:#4ade80; }
+  #fetch-log .fl-err { color:#f87171; }
+  #fetch-log .fl-skip { color:#facc15; }
+  #fetch-log .fl-hdr { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.3); margin-bottom:5px; }
 
   #departures-panel { position:absolute; bottom:90px; left:32px; z-index:500; background:rgba(8,12,20,0.82); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:14px 18px; backdrop-filter:blur(12px); min-width:270px; display:none; }
   #departures-panel.visible { display:block; }
@@ -139,6 +147,11 @@
   <div class="dep-header"><div class="dep-line-dot"></div>2 Line &middot; South Bellevue &rarr; Westlake</div>
   <div id="dep-rows"></div>
   <div class="dep-source">Scheduled</div>
+</div>
+
+<div id="fetch-log">
+  <div class="fl-hdr">Fetch Log</div>
+  <div id="fetch-log-rows"><div class="fl-row"><span class="fl-skip">waiting for first poll…</span></div></div>
 </div>
 
 <script>
@@ -990,21 +1003,46 @@ function spawnTrains() {
   syncCount();
 }
 
+// Visible fetch log — keeps the last 8 entries
+const _fetchLog = [];
+function _logFetch(city, status, detail, ms) {
+  const now = new Date();
+  const ts  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  _fetchLog.unshift({ ts, city, status, detail, ms }); // newest first
+  if (_fetchLog.length > 8) _fetchLog.pop();
+  const container = document.getElementById('fetch-log-rows');
+  if (!container) return;
+  container.innerHTML = _fetchLog.map(e => {
+    const cls = e.status === 'ok' ? 'fl-ok' : e.status === 'skip' ? 'fl-skip' : 'fl-err';
+    const durationPart = e.ms != null ? ` <span style="color:rgba(255,255,255,0.3)">${e.ms}ms</span>` : '';
+    return `<div class="fl-row"><span class="fl-ts">${e.ts}</span><span class="${cls}">[${e.city}] ${e.detail}</span>${durationPart}</div>`;
+  }).join('');
+}
+
 // Fetch real trains from worker and merge into simulation format
 let _fetchInFlight = false;
 async function fetchRealTrains() {
-  if (!WORKER_URL || _fetchInFlight) return;
+  if (!WORKER_URL) return;
+  if (_fetchInFlight) { _logFetch(cityId, 'skip', 'skipped — prev fetch in flight', null); return; }
   // Capture cityId NOW — the fetch is async and the user may switch cities
   // before the response arrives. All state mutations check this snapshot.
   const fetchedCity = cityId;
   if (fetchedCity !== 'nyc' && fetchedCity !== 'seattle' && fetchedCity !== 'paris') return;
 
   _fetchInFlight = true;
+  const t0 = Date.now();
+
+  // AbortSignal.timeout() isn't supported in all browsers (needs Chrome 103+, Safari 16+).
+  // Use AbortController + setTimeout instead for universal compatibility.
+  const ac  = new AbortController();
+  const tid = setTimeout(() => ac.abort(new Error('fetch timeout 12s')), 12000);
+
   try {
-    const resp = await fetch(`${WORKER_URL}/trains/${fetchedCity}`,
-      { signal: AbortSignal.timeout(12000) });
-    if (!resp.ok) throw new Error(`Worker ${resp.status}`);
+    const resp = await fetch(`${WORKER_URL}/trains/${fetchedCity}`, { signal: ac.signal });
+    clearTimeout(tid);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
+    const elapsed = Date.now() - t0;
 
     // User switched cities while the request was in-flight — discard silently.
     if (cityId !== fetchedCity) return;
@@ -1061,12 +1099,17 @@ async function fetchRealTrains() {
     const ss  = String(now.getSeconds()).padStart(2,'0');
     document.getElementById('statusLabel').textContent =
       `Live · ${data.count} trains · ${agency} · updated ${hh}:${mm}:${ss}`;
+    _logFetch(fetchedCity, 'ok', `${data.count} trains`, elapsed);
 
   } catch (e) {
+    clearTimeout(tid);
+    const elapsed = Date.now() - t0;
     // Only show the error if we're still on the city that triggered this fetch
     if (cityId !== fetchedCity) return;
-    console.warn('Worker fetch failed:', e.message);
-    document.getElementById('statusLabel').textContent = 'Live · fetch error — retrying…';
+    const msg = e.name === 'AbortError' ? 'timeout (12s)' : (e.message ?? String(e));
+    console.warn('Worker fetch failed:', msg);
+    document.getElementById('statusLabel').textContent = `Live · ${msg} — retrying…`;
+    _logFetch(fetchedCity, 'err', msg, elapsed);
   } finally {
     _fetchInFlight = false;
   }
@@ -1239,7 +1282,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v3.6', LAST_EDIT='2026-05-28 · 22:30 PT'; // updated on every push
+const VERSION='v3.7', LAST_EDIT='2026-05-28 · 23:10 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();
