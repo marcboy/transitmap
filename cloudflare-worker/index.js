@@ -1022,9 +1022,20 @@ export default {
     if (path === '/trains/paris') {
       const key = env.IDFM_API_KEY;
       if (!key) return json({ error: 'IDFM_API_KEY secret not set' }, 500);
+
+      // Cache the decoded JSON for 20s — parsing 800+ PRIM journeys per-request
+      // was causing intermittent CPU-limit 503s (same issue as NYC before w3.5).
+      const cache    = caches.default;
+      const cacheKey = new Request(request.url);
+      const hit      = await cache.match(cacheKey);
+      if (hit) return hit;
+
       try {
         const trains = await fetchParisTrains(key);
-        return json({ city:'paris', count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp   = json({ city:'paris', count:trains.length, updatedAt:new Date().toISOString(), trains });
+        resp.headers.append('Cache-Control', 'public, max-age=20');
+        ctx.waitUntil(cache.put(cacheKey, resp.clone()));
+        return resp;
       } catch (e) {
         return json({ error: e.message }, 500);
       }
