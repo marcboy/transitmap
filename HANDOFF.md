@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.3 (worker w4.0)  
+> **Prototype version:** v4.3 (worker w4.1)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -294,6 +294,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | w4.1 | Paris: prevent trains skipping multiple stations — PRIM omits intermediate stops so adjacent time-sorted pairs can span 3-4 physical stations. Added distance cap: pairs more than 0.013° apart (~1.44km N-S, ~0.96km E-W at 48.8°N) are rejected. Paris Metro max legitimate inter-station ≈ 950m (La Défense→Esplanade). Both active-segment and fallback loops now use validPair() check. Deployed d3af5ffd |
 | 2026-05-28 | v4.3 | Paris route-constrained animation: trains now move along their metro line polyline instead of flying in a straight line between stop coordinates. At fetch time, both segment endpoints (aLat/aLng and bLat/bLng) are projected onto the route polyline via projectOnRouteT → stored as segTA/segTB. stepTrains interpolates routeAtT(path, segTA + t*(segTB-segTA)) each frame. Straight-line fallback kept for trains with no route path |
 | 2026-05-28 | w4.0 | Fix NYC self-reinforcing 503 loop: same thundering-herd pattern as Paris — compute fails CPU limit → cache.put never runs → cache never refreshes → every request is a miss → loop. Fix: two-tier cache (30s fresh + 300s stale fallback); on compute failure serve stale instead of 503. Cache TTL 15s→30s. Deployed d8c63575 |
 | 2026-05-28 | w3.9 | Fix Paris trains not moving: PRIM returns EstimatedCalls in stop-sequence order (not time order) — bidirectional/loop lines produce pairs like 22:32→22:30→22:34→22:28 so every tArr>tDep check failed. Fix: sort calls by departure time before processing, take 10 calls instead of 5, restore full fallback loop. Result: 14→63 actively moving trains, 11%→42% with valid seg. M14 (automated) at 95%. Deployed 34952ab4 |

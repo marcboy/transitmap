@@ -1147,6 +1147,18 @@ function interpolateParisPosition(calls, now) {
   const dep = c => parseTs(c.ExpectedDepartureTime) ?? parseTs(c.AimedDepartureTime)
                 ?? parseTs(c.ExpectedArrivalTime)   ?? parseTs(c.AimedArrivalTime);
 
+  // Max straight-line distance between two consecutive stops: ~1.4km.
+  // Paris Metro average inter-station = 567m; longest known hop (La Défense →
+  // Esplanade de la Défense on M1) ≈ 950m. PRIM sometimes skips intermediate
+  // stops, creating pairs that span 3-4 physical stations — reject those.
+  // 0.013° ≈ 1.45km latitude / 0.96km longitude at 48.8°N → safe upper bound.
+  const MAX_DIST_SQ = 0.013 * 0.013;
+  const validPair = (cA, cB) => {
+    if (!cA || !cB) return false;
+    const d = (cA[0]-cB[0])**2 + (cA[1]-cB[1])**2;
+    return d <= MAX_DIST_SQ;
+  };
+
   // Walk pairs of consecutive stops looking for the segment containing `now`
   for (let i = 0; i < calls.length - 1; i++) {
     const a = calls[i], b = calls[i + 1];
@@ -1154,24 +1166,18 @@ function interpolateParisPosition(calls, now) {
     const tArr = parseTs(b.ExpectedArrivalTime) ?? parseTs(b.AimedArrivalTime);
     if (!tDep || !tArr || tArr <= tDep) continue;
     if (tArr - tDep > 180000) continue; // skip multi-station gaps > 3 min
-
-    if (now >= tDep && now <= tArr) {
-      const cA = coordsOf(a), cB = coordsOf(b);
-      if (!cA && !cB) continue;
-      if (!cA) return { lat: cB[0], lng: cB[1], bearing: null, seg: null };
-      if (!cB) return { lat: cA[0], lng: cA[1], bearing: null, seg: null };
-      const t = (now - tDep) / (tArr - tDep);
-      const lat = cA[0] + t * (cB[0] - cA[0]);
-      const lng = cA[1] + t * (cB[1] - cA[1]);
-      const bearing = Math.round(Math.atan2(cB[1] - cA[1], cB[0] - cA[0]) * 180 / Math.PI);
-      return { lat, lng, bearing,
-               seg: { aLat: cA[0], aLng: cA[1], tDep, bLat: cB[0], bLng: cB[1], tArr } };
-    }
+    if (now < tDep || now > tArr) continue;
+    const cA = coordsOf(a), cB = coordsOf(b);
+    if (!validPair(cA, cB)) continue; // skip multi-station distance jumps
+    const t = (now - tDep) / (tArr - tDep);
+    const lat = cA[0] + t * (cB[0] - cA[0]);
+    const lng = cA[1] + t * (cB[1] - cA[1]);
+    const bearing = Math.round(Math.atan2(cB[1] - cA[1], cB[0] - cA[0]) * 180 / Math.PI);
+    return { lat, lng, bearing,
+             seg: { aLat: cA[0], aLng: cA[1], tDep, bLat: cB[0], bLng: cB[1], tArr } };
   }
 
-  // No active between-stop segment — find the first upcoming pair (tDep > now)
-  // and return it as a forward segment so the client can animate when it starts.
-  // Calls are sorted by time so we iterate forward and break on first valid pair.
+  // No active between-stop segment — find the first upcoming pair (tDep > now).
   for (let i = 0; i < calls.length - 1; i++) {
     const a = calls[i], b = calls[i + 1];
     const tDep = dep(a);
@@ -1179,7 +1185,7 @@ function interpolateParisPosition(calls, now) {
     if (!tDep || !tArr || tArr <= tDep) continue;
     if (tArr - tDep > 180000) continue;
     const cA = coordsOf(a), cB = coordsOf(b);
-    if (!cA || !cB) continue;
+    if (!validPair(cA, cB)) continue; // same distance cap
     const t = Math.max(0, Math.min(1, (now - tDep) / (tArr - tDep)));
     return {
       lat: cA[0] + t*(cB[0]-cA[0]),
