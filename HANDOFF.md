@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-27  
-> **Prototype version:** v2.9  
+> **Last updated:** 2026-05-28  
+> **Prototype version:** v3.0  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -259,6 +259,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v3.0 | Paris Metro routes rebuilt from official IDFM station coordinates — all 16 lines accurate (M1–M14, M3b, M7b), replacing hand-crafted approximations off by up to ~800m |
 | 2026-05-27 | v2.9 | Fix: LAST_EDIT timestamp was showing 17:30 PT (future); corrected to 11:20 PT |
 | 2026-05-27 | v2.8 | Shinkansen timetable engine: 9 service types, clock-driven positions, no API key needed |
 | 2026-05-27 | v2.7 | Fix GitHub Pages stale cache: no-cache meta tags + ?v= query string in index.html redirect |
