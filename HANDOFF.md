@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v3.5 (worker v3.3)  
+> **Prototype version:** v3.6 (worker v3.4)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -250,6 +250,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v3.6 | Fix frequent fetch failures: add _fetchInFlight guard (prevents overlapping polls), AbortSignal.timeout(12s) on prototype fetch, PRIM cache TTL 15s→30s, cap interpolation to first 3 calls per journey |
 | 2026-05-28 | w3.3 | Paris worker: interpolate train position between stops using ExpectedArrivalTime/ExpectedDepartureTime from SIRI EstimatedCalls — trains no longer snap to fixed stop points but move smoothly between stations based on real timetable timing |
 | 2026-05-28 | v3.5 | Tokyo map rebuilt from OpenStreetMap station coordinates — all 13 lines (9 Tokyo Metro + 4 Toei) redrawn with real station lat/lng; Oedo loop path corrected; zoom adjusted to 12 to show full network |
 | 2026-05-28 | v3.4 | South Bellevue departure board: now fetches live OBA real-time data (stop 40_E09-T2, /departures/south-bellevue worker endpoint); shows "Live · Sound Transit" badge when predicted times available; falls back to schedule if OBA key unavailable |

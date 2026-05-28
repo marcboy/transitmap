@@ -991,15 +991,18 @@ function spawnTrains() {
 }
 
 // Fetch real trains from worker and merge into simulation format
+let _fetchInFlight = false;
 async function fetchRealTrains() {
-  if (!WORKER_URL) return;
+  if (!WORKER_URL || _fetchInFlight) return;
   // Capture cityId NOW — the fetch is async and the user may switch cities
   // before the response arrives. All state mutations check this snapshot.
   const fetchedCity = cityId;
   if (fetchedCity !== 'nyc' && fetchedCity !== 'seattle' && fetchedCity !== 'paris') return;
 
+  _fetchInFlight = true;
   try {
-    const resp = await fetch(`${WORKER_URL}/trains/${fetchedCity}`);
+    const resp = await fetch(`${WORKER_URL}/trains/${fetchedCity}`,
+      { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error(`Worker ${resp.status}`);
     const data = await resp.json();
 
@@ -1064,6 +1067,8 @@ async function fetchRealTrains() {
     if (cityId !== fetchedCity) return;
     console.warn('Worker fetch failed:', e.message);
     document.getElementById('statusLabel').textContent = 'Live · fetch error — retrying…';
+  } finally {
+    _fetchInFlight = false;
   }
 }
 
@@ -1234,7 +1239,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v3.5', LAST_EDIT='2026-05-28 · 22:00 PT'; // updated on every push
+const VERSION='v3.6', LAST_EDIT='2026-05-28 · 22:30 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();

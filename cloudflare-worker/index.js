@@ -1132,8 +1132,8 @@ async function fetchParisTrains(apiKey) {
   const resp = await withTimeout(
     fetch(IDFM_FEED, {
       headers: { 'apikey': apiKey, 'Accept': 'application/json' },
-      cf: { cacheTtl: 15, cacheEverything: true },
-    }), 10000
+      cf: { cacheTtl: 30, cacheEverything: true },
+    }), 12000
   );
   if (!resp.ok) throw new Error(`IDFM feed ${resp.status}`);
 
@@ -1150,7 +1150,7 @@ async function fetchParisTrains(apiKey) {
         if (!line) continue;
 
         const vehicleRef = journey?.VehicleRef?.value ?? journey?.VehicleRef ?? '';
-        const calls = arr(journey?.EstimatedCalls?.EstimatedCall);
+        const calls = arr(journey?.EstimatedCalls?.EstimatedCall).slice(0, 3);
         if (calls.length === 0) continue;
 
         const pos = interpolateParisPosition(calls, now);
