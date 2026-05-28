@@ -1071,14 +1071,61 @@ if (path === '/trains/seattle') {
 };
 
 // ── Paris — IDFM/RATP via PRIM SIRI Lite ─────────────────────
-// PRIM estimated-timetable returns one EstimatedCall per journey (the next stop).
-// We extract the Q-number from StopPointRef and look up coordinates directly.
+// PRIM estimated-timetable returns EstimatedCalls (all remaining stops with
+// expected arrival/departure times). We interpolate the train's actual
+// in-between position from the current wall-clock time.
 
 function arr(v) { return v == null ? [] : Array.isArray(v) ? v : [v]; }
 
 function lookupParisStopById(ref) {
   const m = (ref ?? '').match(/Q:(\d+):/);
   return m ? (PARIS_STOPS_BY_ID[m[1]] ?? null) : null;
+}
+
+// Interpolate a train's lat/lng between two consecutive stops.
+// Returns {lat, lng, bearing} or null if position cannot be determined.
+function interpolateParisPosition(calls, now) {
+  const ms = s => { if (!s) return null; const t = new Date(s).getTime(); return isNaN(t) ? null : t; };
+  const coordsOf = call => {
+    const ref = call?.StopPointRef?.value ?? call?.StopPointRef ?? '';
+    return lookupParisStopById(ref);
+  };
+
+  // Walk pairs of consecutive stops looking for the segment containing `now`
+  for (let i = 0; i < calls.length - 1; i++) {
+    const a = calls[i], b = calls[i + 1];
+    // Best departure time from stop a: prefer expected, fall back to aimed
+    const tDep = ms(a.ExpectedDepartureTime) ?? ms(a.AimedDepartureTime)
+              ?? ms(a.ExpectedArrivalTime)   ?? ms(a.AimedArrivalTime);
+    // Best arrival time at stop b
+    const tArr = ms(b.ExpectedArrivalTime) ?? ms(b.AimedArrivalTime);
+    if (!tDep || !tArr || tArr <= tDep) continue;
+
+    if (now >= tDep && now <= tArr) {
+      const cA = coordsOf(a), cB = coordsOf(b);
+      if (!cA && !cB) continue;
+      if (!cA) return { lat: cB[0], lng: cB[1], bearing: null };
+      if (!cB) return { lat: cA[0], lng: cA[1], bearing: null };
+      const t = (now - tDep) / (tArr - tDep);
+      const lat = cA[0] + t * (cB[0] - cA[0]);
+      const lng = cA[1] + t * (cB[1] - cA[1]);
+      const bearing = Math.round(Math.atan2(cB[1] - cA[1], cB[0] - cA[0]) * 180 / Math.PI);
+      return { lat, lng, bearing };
+    }
+  }
+
+  // No between-stop segment matched — show at the earliest upcoming stop
+  for (const call of calls) {
+    const t = ms(call.ExpectedArrivalTime) ?? ms(call.AimedArrivalTime);
+    if (t && now <= t) {
+      const c = coordsOf(call);
+      return c ? { lat: c[0], lng: c[1], bearing: null } : null;
+    }
+  }
+
+  // All times past — show at last stop (train near terminus)
+  const c = coordsOf(calls[calls.length - 1]);
+  return c ? { lat: c[0], lng: c[1], bearing: null } : null;
 }
 
 async function fetchParisTrains(apiKey) {
@@ -1091,6 +1138,7 @@ async function fetchParisTrains(apiKey) {
   if (!resp.ok) throw new Error(`IDFM feed ${resp.status}`);
 
   const data = await resp.json();
+  const now = Date.now();
   const trains = [];
 
   const deliveries = arr(data?.Siri?.ServiceDelivery?.EstimatedTimetableDelivery);
@@ -1105,19 +1153,18 @@ async function fetchParisTrains(apiKey) {
         const calls = arr(journey?.EstimatedCalls?.EstimatedCall);
         if (calls.length === 0) continue;
 
-        const stopRef = calls[0]?.StopPointRef?.value ?? calls[0]?.StopPointRef ?? '';
-        const coords = lookupParisStopById(stopRef);
-        if (!coords) continue;
+        const pos = interpolateParisPosition(calls, now);
+        if (!pos) continue;
 
         trains.push({
           id:      vehicleRef || `${lineRef}-${trains.length}`,
           line:    line.name,
           color:   line.color,
-          lat:     coords[0],
-          lng:     coords[1],
-          bearing: null,
+          lat:     Math.round(pos.lat * 100000) / 100000,
+          lng:     Math.round(pos.lng * 100000) / 100000,
+          bearing: pos.bearing,
           status:  'IN_TRANSIT',
-          source:  'timetable',
+          source:  'timetable-interpolated',
         });
       }
     }
