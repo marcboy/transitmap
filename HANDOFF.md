@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v3.0  
+> **Prototype version:** v3.0 (worker v3.1)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -19,7 +19,7 @@ An ambient, art-like live transit map showing real subway train positions across
 | City | Data | Source | Status |
 |---|---|---|---|
 | New York | ✅ Real trains | MTA GTFS-RT (free, no key) | **Live** |
-| Paris | 🔄 Real trains | IDFM PRIM GTFS-RT | **Key set, URL debugging** |
+| Paris | ✅ Real trains | IDFM PRIM SIRI Lite estimated-timetable | **Live** |
 | Seattle | ⏳ Real trains | Sound Transit OBA | **Needs OBA key** |
 | Tokyo | 🔲 Simulated | ODPT API | Not started |
 | Shinkansen | ✅ Timetable-driven | Official JR schedules (all lines) | **Live** |
@@ -46,9 +46,9 @@ Sound Transit OBA (free key: wrangler secret put OBA_API_KEY)    (transitmap.mar
 **Worker endpoints:**
 - `GET /health` — instant health check, no feed fetching
 - `GET /trains/nyc` — all MTA subway lines, inferred from stop coordinates
-- `GET /trains/paris` — all RATP metro lines, real GPS (needs IDFM_API_KEY)
+- `GET /trains/paris` — all RATP metro lines, timetable-inferred positions (needs IDFM_API_KEY)
 - `GET /trains/seattle` — Sound Transit Link, real GPS (needs OBA_API_KEY)
-- `GET /paris/probe` — debug: tests 5 IDFM URL patterns to find correct one
+- `GET /paris/debug` — debug: inspects raw SIRI Lite response for metro line 1
 
 ---
 
@@ -120,11 +120,13 @@ Top-left shows city name, train count, and **local time in the city's timezone**
 - Returns ~300-400 trains when MTA system is running
 
 ### Paris (IDFM):
-- Single feed: `https://prim.iledefrance-mobilites.fr/marketplace/gtfs-rt/vehiclePositions`
-- Auth header: `apikey: YOUR_KEY` (not `Authorization: Bearer`)
-- Feed is **vehicle positions** — real GPS lat/lng
-- Filters to metro lines only via `PARIS_LINES` map (IDFM route IDs like `IDFM:C01371`)
-- **Status: URL returning 404 — correct path still being debugged**
+- Feed: `https://prim.iledefrance-mobilites.fr/marketplace/estimated-timetable?LineRef=ALL`
+- Auth header: `apikey: YOUR_KEY`
+- PRIM does **not** publish a GTFS-RT vehicle positions feed — uses SIRI Lite estimated timetable
+- Each `EstimatedVehicleJourney` has one `EstimatedCall` with the next stop's `StopPointRef`
+- `StopPointRef` format: `STIF:StopPoint:Q:XXXXX:` — worker extracts Q-number, looks up coords from `PARIS_STOPS_BY_ID` (805 stops from IDFM `arrets-lignes` dataset)
+- Line IDs: `STIF:Line::C01371:`–`C01384:` = M1–M14; M3b=`C01386`, M7b=`C01387`
+- Returns ~800–900 trains when Paris Metro is running
 
 ### Seattle (Sound Transit OBA):
 - Feed: `https://api.pugetsound.onebusaway.org/api/gtfs_realtime/vehicle-positions-for-agency/40.pb?key=KEY`
@@ -180,22 +182,11 @@ Lines covered: 1, 2, 3, 4, 5, 6, 7, A (×2 branches: Far Rockaway + Lefferts/How
 
 ---
 
-## Paris Debugging — Current State
+## Paris — How It Works
 
-The IDFM API key `poYv9kJPLXNHzVyOGYwGcZhFjY224O9W` is working (server responds, not 401), but all tested URL paths return 404. The correct path is not yet confirmed.
+PRIM does not publish a GTFS-RT vehicle positions feed. The correct endpoint is the **SIRI Lite estimated timetable**, which returns one `EstimatedCall` per active vehicle journey (the next stop). The worker extracts the `StopPointRef` Q-number and looks up coordinates from an embedded 805-stop table built from the IDFM `arrets-lignes` open data dataset.
 
-Paths tried (all 404):
-```
-/marketplace/gtfs-rt/vehiclePositions
-/marketplace/v2/gtfs-rt/vehiclePositions
-/marketplace/gtfs-rt/vehicle-positions
-/marketplace/v2/gtfs-rt/vehicle-positions
-/marketplace/gtfs-realtime/vehiclePositions
-```
-
-**Next step:** Log into https://prim.iledefrance-mobilites.fr, find the subscribed API, and copy the exact endpoint URL shown in the API documentation page. Use `/paris/probe` endpoint to test new URL patterns.
-
-> ⚠️ Rotate the IDFM API key — it has been visible in chat history.
+> ⚠️ Rotate the IDFM API key — it was visible in earlier chat history.
 
 ---
 
@@ -259,6 +250,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v3.1 | Paris live data working: switched from non-existent GTFS-RT feed to PRIM SIRI Lite estimated-timetable; 805-stop ID lookup table; correct STIF line IDs; ~850 trains live |
 | 2026-05-28 | v3.0 | Paris Metro routes rebuilt from official IDFM station coordinates — all 16 lines accurate (M1–M14, M3b, M7b), replacing hand-crafted approximations off by up to ~800m |
 | 2026-05-27 | v2.9 | Fix: LAST_EDIT timestamp was showing 17:30 PT (future); corrected to 11:20 PT |
 | 2026-05-27 | v2.8 | Shinkansen timetable engine: 9 service types, clock-driven positions, no API key needed |
