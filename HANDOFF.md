@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.2 (worker w3.8)  
+> **Prototype version:** v4.2 (worker w3.9)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -213,7 +213,7 @@ PRIM does not publish a GTFS-RT vehicle positions feed. The correct endpoint is 
 
 4. **Paris line paths** — a Python generator script exists at `prototype/paris_routes_gen.py`. Run it and paste the output into the prototype to replace the hand-drawn route polylines with accurate IDFM coordinates.
 
-5. **More trains visible in Paris** — currently ~25% of journeys get a `seg` (usable timetable segment). The rest hit the "absolute fallback" (no valid calls). Investigate by hitting `/paris/debug` to see raw PRIM structure for a few trains; may need to look at more than 5 `EstimatedCall` entries per journey.
+5. **More trains visible in Paris** — currently 42% of journeys get a `seg` (usable timetable segment), up from 11%. The remaining 58% either have only 1 call in PRIM (can't interpolate — need 2 stops to form a segment) or their stop Q-IDs aren't in our 805-stop lookup table. To investigate: hit `/paris/debug` and look for stop IDs that return null from `lookupParisStopById`.
 
 6. **Tokyo live data** — ODPT API, free key at https://developer.odpt.org. Add `/trains/tokyo` worker endpoint.
 
@@ -294,6 +294,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | w3.9 | Fix Paris trains not moving: PRIM returns EstimatedCalls in stop-sequence order (not time order) — bidirectional/loop lines produce pairs like 22:32→22:30→22:34→22:28 so every tArr>tDep check failed. Fix: sort calls by departure time before processing, take 10 calls instead of 5, restore full fallback loop. Result: 14→63 actively moving trains, 11%→42% with valid seg. M14 (automated) at 95%. Deployed 34952ab4 |
 | 2026-05-28 | w3.8 | Fix Paris intermittent 503 (thundering herd + CPU limit): (1) module-level timestamp memoization (_tsCache Map) cuts ~24,000 new Date() calls per compute to near-zero; (2) two-tier cache — 60s fresh key + 300s stale-fallback key; PRIM failure now serves last good response instead of 503; (3) fallback loop shortened from O(n) to O(1) by only checking calls[0]→calls[1]. 10/10 parallel requests return 200. Deployed e1e74bbc |
 | 2026-05-28 | v4.2 | Paris clock-driven animation: worker now returns timetable segment endpoints (aLat/aLng/tDep → bLat/bLng/tArr); client uses Date.now() to interpolate continuously — no velocity, no ID matching. Worker also returns upcoming segments (train departing soon) so 25% of trains have a segment vs 6% before. Cap at 180s filters PRIM multi-station gaps. Median segment 97s = correct Metro speed |
 | 2026-05-28 | w3.7 | Paris interpolation: worker returns seg {aLat,aLng,tDep,bLat,bLng,tArr} per train; fallback builds upcoming call[0]→call[1] segment so trains animate automatically when departure time passes; cap 180s filters multi-station PRIM gaps; calls slice 3→5 |

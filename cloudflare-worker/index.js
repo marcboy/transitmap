@@ -1160,24 +1160,24 @@ function interpolateParisPosition(calls, now) {
     }
   }
 
-  // No active between-stop segment — use calls[0]→calls[1] as upcoming forward segment.
-  // Only check the first pair (O(1)); PRIM's first call is always the next stop.
-  if (calls.length >= 2) {
-    const a = calls[0], b = calls[1];
+  // No active between-stop segment — find the first upcoming pair (tDep > now)
+  // and return it as a forward segment so the client can animate when it starts.
+  // Calls are sorted by time so we iterate forward and break on first valid pair.
+  for (let i = 0; i < calls.length - 1; i++) {
+    const a = calls[i], b = calls[i + 1];
     const tDep = dep(a);
     const tArr = parseTs(b.ExpectedArrivalTime) ?? parseTs(b.AimedArrivalTime);
-    if (tDep && tArr && tArr > tDep && tArr - tDep <= 180000) {
-      const cA = coordsOf(a), cB = coordsOf(b);
-      if (cA && cB) {
-        const t = Math.max(0, Math.min(1, (now - tDep) / (tArr - tDep)));
-        return {
-          lat: cA[0] + t*(cB[0]-cA[0]),
-          lng: cA[1] + t*(cB[1]-cA[1]),
-          bearing: Math.round(Math.atan2(cB[1]-cA[1], cB[0]-cA[0]) * 180/Math.PI),
-          seg: { aLat: cA[0], aLng: cA[1], tDep, bLat: cB[0], bLng: cB[1], tArr },
-        };
-      }
-    }
+    if (!tDep || !tArr || tArr <= tDep) continue;
+    if (tArr - tDep > 180000) continue;
+    const cA = coordsOf(a), cB = coordsOf(b);
+    if (!cA || !cB) continue;
+    const t = Math.max(0, Math.min(1, (now - tDep) / (tArr - tDep)));
+    return {
+      lat: cA[0] + t*(cB[0]-cA[0]),
+      lng: cA[1] + t*(cB[1]-cA[1]),
+      bearing: Math.round(Math.atan2(cB[1]-cA[1], cB[0]-cA[0]) * 180/Math.PI),
+      seg: { aLat: cA[0], aLng: cA[1], tDep, bLat: cB[0], bLng: cB[1], tArr },
+    };
   }
 
   // Absolute fallback — no usable stops at all
@@ -1211,7 +1211,18 @@ async function fetchParisTrains(apiKey) {
                          ?? journey?.DatedVehicleJourneyRef
                          ?? journey?.VehicleJourneyRef?.value
                          ?? journey?.VehicleJourneyRef ?? '';
-        const calls = arr(journey?.EstimatedCalls?.EstimatedCall).slice(0, 5);
+        // Sort by departure time — PRIM returns calls in stop-sequence order which
+        // is often NOT chronological (trains on loop segments, bidirectional lines).
+        // Without sorting, adjacent pairs fail tArr > tDep and no segment is found.
+        const rawCalls = arr(journey?.EstimatedCalls?.EstimatedCall);
+        rawCalls.sort((a, b) => {
+          const tA = parseTs(a.ExpectedDepartureTime) ?? parseTs(a.AimedDepartureTime)
+                  ?? parseTs(a.ExpectedArrivalTime)   ?? parseTs(a.AimedArrivalTime) ?? 0;
+          const tB = parseTs(b.ExpectedDepartureTime) ?? parseTs(b.AimedDepartureTime)
+                  ?? parseTs(b.ExpectedArrivalTime)   ?? parseTs(b.AimedArrivalTime) ?? 0;
+          return tA - tB;
+        });
+        const calls = rawCalls.slice(0, 10);
         if (calls.length === 0) continue;
 
         const pos = interpolateParisPosition(calls, now);
