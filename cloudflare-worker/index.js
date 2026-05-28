@@ -1000,9 +1000,20 @@ export default {
 
 
     if (path === '/trains/nyc') {
+      // Cache the fully-decoded JSON response for 15s.
+      // Protobuf decode of 8 concurrent feeds is CPU-heavy; without this every
+      // poll re-runs the full decode and hits the Workers CPU time limit (1102).
+      const cache    = caches.default;
+      const cacheKey = new Request(request.url);
+      const hit      = await cache.match(cacheKey);
+      if (hit) return hit;
+
       try {
         const trains = await fetchAllMTATrains();
-        return json({ city:'nyc', count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp   = json({ city:'nyc', count:trains.length, updatedAt:new Date().toISOString(), trains });
+        resp.headers.append('Cache-Control', 'public, max-age=15');
+        ctx.waitUntil(cache.put(cacheKey, resp.clone()));
+        return resp;
       } catch (e) {
         return json({ error: e.message }, 500);
       }
@@ -1321,7 +1332,7 @@ function withTimeout(p, ms) {
 }
 
 async function fetchFeed(url) {
-  const resp = await fetch(url, { cf:{ cacheTtl:10, cacheEverything:true } });
+  const resp = await fetch(url, { cf:{ cacheTtl:30, cacheEverything:true } });
   if (!resp.ok) throw new Error(`${resp.status}`);
   return decodeFeed(new Uint8Array(await resp.arrayBuffer()));
 }
@@ -1411,6 +1422,9 @@ function decodePosition(bytes) {
   return p;
 }
 
+// Shared decoder — creating one per str() call is expensive at scale
+const _td = new TextDecoder();
+
 class PB {
   constructor(b){this.b=b;this.p=0;}
   ok(){return this.p<this.b.length;}
@@ -1420,8 +1434,10 @@ class PB {
     while(true){const b=this.b[this.p++];r|=(b&0x7f)<<s;s+=7;if(!(b&0x80))break;}
     return r>>>0;
   }
-  bytes(){const l=this.varint(),s=this.b.slice(this.p,this.p+l);this.p+=l;return s;}
-  str(){return new TextDecoder().decode(this.bytes());}
+  // bytes() returns a zero-copy view (subarray) rather than a slice/copy
+  bytes(){const l=this.varint(),s=this.b.subarray(this.p,this.p+l);this.p+=l;return s;}
+  // str() avoids the extra copy by viewing the buffer directly
+  str(){const l=this.varint(),v=new Uint8Array(this.b.buffer,this.b.byteOffset+this.p,l);this.p+=l;return _td.decode(v);}
   float(){const v=new DataView(this.b.buffer,this.b.byteOffset+this.p,4).getFloat32(0,true);this.p+=4;return v;}
   skip(w){
     if(w===0)this.varint();
