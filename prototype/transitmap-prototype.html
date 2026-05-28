@@ -74,6 +74,14 @@
   #fetch-log .fl-err { color:#f87171; }
   #fetch-log .fl-skip { color:#facc15; }
   #fetch-log .fl-hdr { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.3); margin-bottom:5px; }
+  #fetch-log .fl-stats { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); }
+  #fetch-log .fl-stat-city { display:flex; flex-direction:column; gap:1px; min-width:70px; }
+  #fetch-log .fl-stat-name { font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:rgba(255,255,255,0.35); }
+  #fetch-log .fl-stat-nums { font-size:11px; }
+  #fetch-log .fl-stat-ok  { color:#4ade80; }
+  #fetch-log .fl-stat-err { color:#f87171; }
+  #fetch-log .fl-stat-sep { color:rgba(255,255,255,0.2); }
+  #fetch-log .fl-reset    { font-size:9px; color:rgba(255,255,255,0.2); margin-bottom:6px; }
 
   #departures-panel { position:absolute; bottom:90px; left:32px; z-index:500; background:rgba(8,12,20,0.82); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:14px 18px; backdrop-filter:blur(12px); min-width:270px; display:none; }
   #departures-panel.visible { display:block; }
@@ -150,7 +158,10 @@
 </div>
 
 <div id="fetch-log">
-  <div class="fl-hdr">Fetch Log</div>
+  <div class="fl-hdr">Fetch Stats</div>
+  <div id="fetch-stats" class="fl-stats"></div>
+  <div id="fetch-reset-label" class="fl-reset"></div>
+  <div class="fl-hdr" style="margin-top:2px">Recent</div>
   <div id="fetch-log-rows"><div class="fl-row"><span class="fl-skip">waiting for first poll…</span></div></div>
 </div>
 
@@ -1002,9 +1013,46 @@ function spawnTrains() {
   syncCount();
 }
 
+// Per-city fetch counters — reset daily
+const _fetchStats = { nyc:{ok:0,err:0}, paris:{ok:0,err:0}, seattle:{ok:0,err:0} };
+let _statsDay = new Date().toDateString(); // tracks current calendar day
+
+function _renderFetchStats() {
+  const statsEl = document.getElementById('fetch-stats');
+  const resetEl = document.getElementById('fetch-reset-label');
+  if (!statsEl) return;
+  statsEl.innerHTML = Object.entries(_fetchStats).map(([city, s]) => {
+    const total = s.ok + s.err;
+    const pct   = total > 0 ? Math.round(100 * s.ok / total) : '—';
+    return `<div class="fl-stat-city">
+      <div class="fl-stat-name">${city}</div>
+      <div class="fl-stat-nums">
+        <span class="fl-stat-ok">${s.ok}✓</span>
+        <span class="fl-stat-sep"> / </span>
+        <span class="fl-stat-err">${s.err}✗</span>
+        <span style="color:rgba(255,255,255,0.25)"> ${pct}%</span>
+      </div>
+    </div>`;
+  }).join('');
+  if (resetEl) resetEl.textContent = `resets daily · since ${_statsDay}`;
+}
+
 // Visible fetch log — keeps the last 8 entries
 const _fetchLog = [];
 function _logFetch(city, status, detail, ms) {
+  // Daily reset: if calendar day rolled over, zero all counters
+  const today = new Date().toDateString();
+  if (today !== _statsDay) {
+    _statsDay = today;
+    Object.keys(_fetchStats).forEach(k => { _fetchStats[k].ok = 0; _fetchStats[k].err = 0; });
+  }
+
+  // Increment counter (skip doesn't count — it means no real attempt was made)
+  if (status === 'ok'  && _fetchStats[city]) _fetchStats[city].ok++;
+  if (status === 'err' && _fetchStats[city]) _fetchStats[city].err++;
+
+  _renderFetchStats();
+
   const now = new Date();
   const ts  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
   _fetchLog.unshift({ ts, city, status, detail, ms }); // newest first
@@ -1331,7 +1379,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.0', LAST_EDIT='2026-05-29 · 00:30 PT'; // updated on every push
+const VERSION='v4.1', LAST_EDIT='2026-05-29 · 01:00 PT'; // updated on every push
 let _lastDepMin = -1;
 function tick() {
   const n=new Date();

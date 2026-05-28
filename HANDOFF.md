@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.0 (worker v3.6)  
+> **Prototype version:** v4.1 (worker v3.6)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -250,6 +250,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v4.1 | Fetch stats panel: per-city success/fail counters (✓/✗ + %) displayed in fetch-log panel; resets at midnight (daily); skips don't count as attempts |
 | 2026-05-28 | v4.0 | Route-constrained animation: trains advance along their route polyline instead of dead-reckoning in lat/lng space. projectOnRouteT() snaps each reported position onto the track; routeSpeed (ΔrouteT/ms from last 2 fetches) drives per-frame motion. Trains never drift off their line. Direction is natural from sign of speed. No route path = stays at reported position |
 | 2026-05-28 | v3.9 | Dead-reckoning animation: replaced 15s lerp (froze when complete) with velocity extrapolation — measure speed from last 2 fetches, continue at that rate until next fetch corrects position. Trains now move continuously. First fetch has v=0; velocity resets on each new fetch pair. Cap at 120s to prevent runaway drift |
 | 2026-05-28 | v3.8 | Fix status pill showing stale data from previous city: switchCity() now immediately sets correct label per city type ("Connecting…" for live cities, "Simulated · Tokyo Metro" for Tokyo, kept Timetable for Shinkansen), and triggers an immediate fetch instead of waiting up to 15s |
