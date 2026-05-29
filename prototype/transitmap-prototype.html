@@ -1180,7 +1180,7 @@ leafletMap = L.map('leaflet-map', {
 
 const TILE_URLS = {
   dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
 };
 let mapTheme = 'dark';
 let tileLayer = L.tileLayer(TILE_URLS.dark, { maxZoom: 19 }).addTo(leafletMap);
@@ -1194,6 +1194,7 @@ function toggleTheme() {
   document.documentElement.style.setProperty('--bg',
     mapTheme === 'dark' ? '#080c14' : '#dce4ec');
   document.getElementById('themeBtn').textContent = mapTheme === 'dark' ? '☀' : '🌑';
+  drawRoutes();
 }
 
 routeLayer = L.layerGroup().addTo(leafletMap);
@@ -1219,11 +1220,12 @@ window.addEventListener('resize', () => { resizeCanvas(); leafletMap.invalidateS
 // ── ROUTES ───────────────────────────────────────────────────
 function drawRoutes() {
   routeLayer.clearLayers();
+  const lt = mapTheme === 'light';
   CITIES[cityId].routes.forEach(route => {
-    L.polyline(route.path, { color:route.color, weight:12, opacity:0.12, lineCap:'round', lineJoin:'round' }).addTo(routeLayer);
-    L.polyline(route.path, { color:route.color, weight:3.5, opacity:0.8,  lineCap:'round', lineJoin:'round' }).addTo(routeLayer);
+    L.polyline(route.path, { color:route.color, weight:lt?10:12, opacity:lt?0.07:0.12, lineCap:'round', lineJoin:'round' }).addTo(routeLayer);
+    L.polyline(route.path, { color:route.color, weight:3.5, opacity:lt?0.55:0.8, lineCap:'round', lineJoin:'round' }).addTo(routeLayer);
     route.path.forEach(pt => {
-      L.circleMarker(pt, { radius:4, fillColor:'#0a0d17', color:route.color, fillOpacity:1, weight:2, opacity:0.9 }).addTo(routeLayer);
+      L.circleMarker(pt, { radius:4, fillColor:lt?'#f0f0f0':'#0a0d17', color:route.color, fillOpacity:1, weight:2, opacity:lt?0.55:0.9 }).addTo(routeLayer);
     });
   });
 }
@@ -1581,6 +1583,7 @@ function drawTrains() {
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
   const bright = ['#FFCD00','#FCCC0A','#B6BD00','#6CBE45','#6ECA97','#A7A9AC','#FF9500','#C3A400'];
+  const lt = mapTheme === 'light';
 
   trains.forEach(tr => {
     const ll  = trainLatLng(tr);
@@ -1592,16 +1595,17 @@ function drawTrains() {
     const pulse = (Math.sin(tr.phase)+1)/2;
     const col   = tr.route.color;
 
-    // Glow halo
-    const grd = ctx.createRadialGradient(x,y,0,x,y,r*3.5);
-    grd.addColorStop(0, col+'be');
-    grd.addColorStop(0.3, col+'50');
+    // Glow halo — smaller and softer in light mode
+    const glowR = lt ? r * 2.2 : r * 3.5;
+    const grd = ctx.createRadialGradient(x,y,0,x,y,glowR);
+    grd.addColorStop(0, col + (lt ? '80' : 'be'));
+    grd.addColorStop(0.3, col + (lt ? '30' : '50'));
     grd.addColorStop(1, col+'00');
-    ctx.beginPath(); ctx.arc(x,y,r*3.5,0,Math.PI*2); ctx.fillStyle=grd; ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,glowR,0,Math.PI*2); ctx.fillStyle=grd; ctx.fill();
 
     // Pulse ring when stopped
     if (tr.status==='STOP') {
-      const a = Math.round(pulse*150).toString(16).padStart(2,'0');
+      const a = Math.round(pulse*(lt?100:150)).toString(16).padStart(2,'0');
       ctx.beginPath(); ctx.arc(x,y,r*(1.7+pulse*0.9),0,Math.PI*2);
       ctx.strokeStyle=col+a; ctx.lineWidth=2; ctx.stroke();
     }
@@ -1609,9 +1613,10 @@ function drawTrains() {
     // Circle
     ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=col; ctx.fill();
 
-    // White rim
+    // Rim — white on dark map, dark on light map
     ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1.8; ctx.stroke();
+    ctx.strokeStyle = lt ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.4)';
+    ctx.lineWidth=1.8; ctx.stroke();
 
     // Label
     ctx.fillStyle     = bright.includes(col.toUpperCase()) ? '#0a0c10' : '#ffffff';
@@ -1697,7 +1702,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.17', LAST_EDIT='2026-05-28 · 20:09 PT';
+const VERSION='v4.18', LAST_EDIT='2026-05-28 · 20:14 PT';
 
 function toPT(isoString) {
   if (!isoString) return '—';
