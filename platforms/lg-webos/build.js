@@ -122,6 +122,32 @@ if (typeof Platform !== 'undefined') {
   Platform.init();
   if (typeof initTVNav === 'function') initTVNav();
 }
+
+// ── LG webOS: prevent screensaver / auto-off ─────────────────────────────────
+// Two-pronged: (1) Luna service disables the system screensaver; (2) synthetic
+// mouse events reset the browser-level idle timer so the remote staying still
+// doesn't blank the screen even if the service call is denied.
+(function() {
+  if (typeof webOS === 'undefined') return;
+
+  function keepOn() {
+    webOS.service.request('luna://com.webos.service.tvpower', {
+      method: 'power/changeScreenSaverSettings',
+      parameters: { screenSaverEnabled: false },
+      onSuccess: function() {},
+      onFailure: function() {}
+    });
+    // Belt-and-suspenders: synthesise a tiny mouse move to reset idle timer
+    document.dispatchEvent(new MouseEvent('mousemove', {
+      bubbles: true, cancelable: true,
+      clientX: Math.round(Math.random() * 1920),
+      clientY: Math.round(Math.random() * 1080)
+    }));
+  }
+
+  keepOn();
+  setInterval(keepOn, 60000); // re-assert every minute
+})();
 `;
   html = html.replace(/(<\/script>)(\s*<\/body>)/, tvInit + '$1$2');
 

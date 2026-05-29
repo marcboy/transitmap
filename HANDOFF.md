@@ -1,6 +1,6 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-29 · 14:20 PT
+> **Last updated:** 2026-05-29 · 14:31 PT
 > **Prototype version:** v4.20 · **Worker version:** w4.8
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
@@ -357,6 +357,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-29 | — | LG webOS: screensaver prevention — Luna service `changeScreenSaverSettings` + synthetic mousemove every 60s; fixes screen going black during ambient display |
 | 2026-05-29 | w4.8 | Worker: stale TTL 300s→86400s for all cities (24h cache survives TV idle); add two-tier caching to Seattle (had none); eliminates LG TV 503s |
 | 2026-05-29 | — | LG webOS: restore city switcher + fetch log (LG Magic Remote is a pointer — mouse UI works); both hidden on Samsung D-pad-only build |
 | 2026-05-29 | — | LG webOS app built: build.js + appinfo.json + ares-package → com.marcboyer.transitmap_1.0.0_all.ipk (34 KB); shares tv-nav.js + platform.js with Samsung |
