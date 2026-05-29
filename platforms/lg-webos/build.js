@@ -144,32 +144,38 @@ if (typeof Platform !== 'undefined') {
   if (ws) ws.textContent = '${workerVersion} · built ${buildTime.slice(0,10)}';
 })();
 
-// ── LG webOS: prevent screensaver / auto-off ─────────────────────────────────
-// DOM events (mousemove etc.) do NOT reach the OS-level screensaver — only
-// Luna service calls do. We use two complementary service calls:
-//   1. com.webos.service.tvpower  → changeScreenSaverSettings (disables screensaver)
-//   2. com.webos.service.settings → setSystemSettings screenOffTime:'0' (display timeout off)
-// Both are re-asserted every 30 s, well inside the 2-minute default timeout.
+// ── LG webOS: prevent screensaver via hidden canvas video stream ──────────────
+// The OS suppresses idle timeouts when a video element is actively playing.
+// We stream a 2×2 canvas into a hidden <video> — the OS sees live video,
+// never idles. Canvas alternates colour each second so the stream is never
+// a frozen static frame (some firmware detects and discounts frozen streams).
+// opacity:0.01 rather than 0 — some webOS builds skip the idle-reset for
+// invisible (opacity=0) video elements.
 (function() {
-  if (typeof webOS === 'undefined') return;
+  try {
+    var canvas = document.createElement('canvas');
+    canvas.width = 2; canvas.height = 2;
+    var ctx = canvas.getContext('2d');
+    var n = 0;
 
-  function keepOn() {
-    webOS.service.request('luna://com.webos.service.tvpower', {
-      method: 'power/changeScreenSaverSettings',
-      parameters: { screenSaverEnabled: false },
-      onSuccess: function() {},
-      onFailure: function() {}
-    });
-    webOS.service.request('luna://com.webos.service.settings', {
-      method: 'setSystemSettings',
-      parameters: { category: 'tv', settings: { screenOffTime: '0' } },
-      onSuccess: function() {},
-      onFailure: function() {}
-    });
-  }
+    var vid = document.createElement('video');
+    vid.muted = true;
+    vid.loop = true;
+    vid.setAttribute('playsinline', '');
+    vid.style.cssText = 'position:fixed;top:0;left:0;width:2px;height:2px;' +
+                        'opacity:0.01;pointer-events:none;z-index:-9999';
 
-  keepOn();
-  setInterval(keepOn, 30000); // every 30 s — well within the 2-min timeout
+    if (typeof canvas.captureStream === 'function') {
+      vid.srcObject = canvas.captureStream(1); // 1 fps is enough
+      document.body.appendChild(vid);
+      vid.play().catch(function() {});
+    }
+
+    setInterval(function() {
+      ctx.fillStyle = (n++ & 1) ? '#010101' : '#020202';
+      ctx.fillRect(0, 0, 2, 2);
+    }, 1000);
+  } catch(e) {}
 })();
 `;
   html = html.replace(/(<\/script>)(\s*<\/body>)/, tvInit + '$1$2');
