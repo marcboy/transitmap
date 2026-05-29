@@ -15,7 +15,7 @@ function parseTs(s) {
   return v;
 }
 
-const WORKER_VERSION = 'w4.4';
+const WORKER_VERSION = 'w4.6';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -1060,6 +1060,187 @@ const SYDNEY_LINE_MAP = {
   'NTH':  { line:'T9', color:'#00888A' }, // Northern
 };
 
+// ── Tokyo — ODPT API (JSON, not protobuf) ────────────────────
+const ODPT_BASE = 'https://api.odpt.org/api/v4';
+
+const TOKYO_LINE_MAP = {
+  'odpt.Railway:TokyoMetro.Ginza':        { line:'G', color:'#FF9500' },
+  'odpt.Railway:TokyoMetro.Marunouchi':   { line:'M', color:'#E60012' },
+  'odpt.Railway:TokyoMetro.MarunouchiB':  { line:'M', color:'#E60012' },
+  'odpt.Railway:TokyoMetro.Hibiya':       { line:'H', color:'#9C9E9F' },
+  'odpt.Railway:TokyoMetro.Tozai':        { line:'T', color:'#009BBF' },
+  'odpt.Railway:TokyoMetro.Chiyoda':      { line:'C', color:'#00BB85' },
+  'odpt.Railway:TokyoMetro.ChiyodaB':     { line:'C', color:'#00BB85' },
+  'odpt.Railway:TokyoMetro.Yurakucho':    { line:'Y', color:'#C3A400' },
+  'odpt.Railway:TokyoMetro.Hanzomon':     { line:'Z', color:'#8F76D6' },
+  'odpt.Railway:TokyoMetro.Namboku':      { line:'N', color:'#00AC9B' },
+  'odpt.Railway:TokyoMetro.Fukutoshin':   { line:'F', color:'#9C5E31' },
+  'odpt.Railway:Toei.Asakusa':            { line:'A',  color:'#EE4B98' },
+  'odpt.Railway:Toei.Shinjuku':           { line:'S',  color:'#6CBB5A' },
+  'odpt.Railway:Toei.Mita':               { line:'I',  color:'#0079C2' },
+  'odpt.Railway:Toei.Oedo':               { line:'E',  color:'#B6007A' },
+  'odpt.Railway:Toei.Arakawa':            { line:'AR', color:'#DAA520' },
+};
+
+// Station coords keyed by last two segments of ODPT station ID (LineName.StationName)
+// e.g. "odpt.Station:TokyoMetro.Ginza.Shibuya" → "Ginza.Shibuya"
+const TOKYO_STATIONS = {
+  'Ginza.Shibuya':[35.6589,139.7025],'Ginza.Omotesando':[35.6650,139.7125],
+  'Ginza.Gaienmae':[35.6705,139.7178],'Ginza.AoyamaItchome':[35.6726,139.7240],
+  'Ginza.AkasakaMitsuke':[35.6763,139.7374],'Ginza.TameikeSanno':[35.6715,139.7419],
+  'Ginza.Toranomon':[35.6701,139.7500],'Ginza.Shimbashi':[35.6672,139.7588],
+  'Ginza.Ginza':[35.6714,139.7653],'Ginza.Kyobashi':[35.6767,139.7701],
+  'Ginza.Nihombashi':[35.6821,139.7734],'Ginza.Mitsukoshimae':[35.6871,139.7737],
+  'Ginza.Kanda':[35.6937,139.7709],'Ginza.Suehirocho':[35.7029,139.7717],
+  'Ginza.UenoHirokoji':[35.7078,139.7730],'Ginza.Ueno':[35.7117,139.7762],
+  'Ginza.Inaricho':[35.7114,139.7827],'Ginza.Tawaramachi':[35.7099,139.7908],
+  'Ginza.Asakusa':[35.7108,139.7978],
+  'Marunouchi.Ogikubo':[35.7043,139.6200],'Marunouchi.MinamiAsagaya':[35.6994,139.6357],
+  'Marunouchi.Shinkoenji':[35.6979,139.6487],'Marunouchi.HigashiKoenji':[35.6980,139.6582],
+  'Marunouchi.ShinNakano':[35.6975,139.6686],'Marunouchi.NakanoSakaue':[35.6972,139.6819],
+  'Marunouchi.NishiShinjuku':[35.6944,139.6928],'Marunouchi.Shinjuku':[35.6923,139.7006],
+  'Marunouchi.ShinjukuSanchome':[35.6913,139.7041],'Marunouchi.ShinjukuGyoenmae':[35.6886,139.7107],
+  'Marunouchi.YotsuyaSanchome':[35.6880,139.7206],'Marunouchi.Yotsuya':[35.6847,139.7300],
+  'Marunouchi.AkasakaMitsuke':[35.6763,139.7376],'Marunouchi.KokkaiGijidomae':[35.6746,139.7455],
+  'Marunouchi.Kasumigaseki':[35.6742,139.7529],'Marunouchi.Ginza':[35.6729,139.7631],
+  'Marunouchi.Tokyo':[35.6821,139.7649],'Marunouchi.Otemachi':[35.6868,139.7662],
+  'Marunouchi.Awajicho':[35.6951,139.7675],'Marunouchi.Ochanomizu':[35.7006,139.7641],
+  'Marunouchi.HongoSanchome':[35.7065,139.7601],'Marunouchi.Korakuen':[35.7073,139.7512],
+  'Marunouchi.Myogadani':[35.7172,139.7369],'Marunouchi.ShinOtsuka':[35.7258,139.7299],
+  'Marunouchi.Ikebukuro':[35.7295,139.7109],
+  'Hibiya.NakaMeguro':[35.6441,139.6988],'Hibiya.Ebisu':[35.6470,139.7086],
+  'Hibiya.Hiroo':[35.6521,139.7222],'Hibiya.Roppongi':[35.6629,139.7313],
+  'Hibiya.Kamiyacho':[35.6630,139.7450],'Hibiya.ToranomōnHills':[35.6675,139.7478],
+  'Hibiya.ToranomönHills':[35.6675,139.7478],'Hibiya.ToranomónHills':[35.6675,139.7478],
+  'Hibiya.ToranomōnHills':[35.6675,139.7478],'Hibiya.ToranomonHills':[35.6675,139.7478],
+  'Hibiya.Hibiya':[35.6744,139.7604],'Hibiya.Kasumigaseki':[35.6739,139.7510],
+  'Hibiya.Ginza':[35.6721,139.7639],'Hibiya.HigashiGinza':[35.6698,139.7670],
+  'Hibiya.Tsukiji':[35.6681,139.7726],'Hibiya.Hatchobori':[35.6750,139.7770],
+  'Hibiya.Kayabacho':[35.6793,139.7797],'Hibiya.Ningyocho':[35.6862,139.7824],
+  'Hibiya.Kodemmacho':[35.6907,139.7784],'Hibiya.Akihabara':[35.6985,139.7755],
+  'Hibiya.NakaOkachimachi':[35.7066,139.7761],'Hibiya.Ueno':[35.7119,139.7776],
+  'Hibiya.Iriya':[35.7207,139.7846],'Hibiya.Minowa':[35.7296,139.7913],
+  'Hibiya.MinamiSenju':[35.7323,139.7988],'Hibiya.KitaSenju':[35.7495,139.8053],
+  'Tozai.Nakano':[35.7058,139.6655],'Tozai.Ochiai':[35.7107,139.6859],
+  'Tozai.Takadanobaba':[35.7134,139.7050],'Tozai.Waseda':[35.7058,139.7213],
+  'Tozai.Kagurazaka':[35.7039,139.7342],'Tozai.Iidabashi':[35.7017,139.7460],
+  'Tozai.Kudanshita':[35.6960,139.7513],'Tozai.Takebashi':[35.6901,139.7587],
+  'Tozai.Otemachi':[35.6847,139.7664],'Tozai.Nihombashi':[35.6823,139.7745],
+  'Tozai.Kayabacho':[35.6803,139.7794],'Tozai.MonzenNakacho':[35.6723,139.7951],
+  'Tozai.Toyocho':[35.6696,139.8175],'Tozai.MinamiSunamachi':[35.6684,139.8319],
+  'Tozai.NishiKasai':[35.6646,139.8593],'Tozai.Kasai':[35.6637,139.8727],
+  'Tozai.Urayasu':[35.6658,139.8930],'Tozai.MinamiGyotoku':[35.6727,139.9023],
+  'Tozai.Gyotoku':[35.6829,139.9145],'Tozai.Myoden':[35.6912,139.9243],
+  'Tozai.BarakiNakayama':[35.7032,139.9416],'Tozai.NishiFunabashi':[35.7073,139.9589],
+  'Chiyoda.YoyogiUehara':[35.6648,139.6882],'Chiyoda.YoyogiKoen':[35.6691,139.6901],
+  'Chiyoda.MeijiJingumae':[35.6690,139.7044],'Chiyoda.Omotesando':[35.6653,139.7124],
+  'Chiyoda.Nogizaka':[35.6667,139.7263],'Chiyoda.Akasaka':[35.6722,139.7363],
+  'Chiyoda.KokkaiGijidomae':[35.6738,139.7434],'Chiyoda.Kasumigaseki':[35.6726,139.7517],
+  'Chiyoda.Hibiya':[35.6738,139.7583],'Chiyoda.Nijubashimae':[35.6803,139.7616],
+  'Chiyoda.Otemachi':[35.6868,139.7636],'Chiyoda.ShinOchanomizu':[35.6972,139.7655],
+  'Chiyoda.Yushima':[35.7073,139.7699],'Chiyoda.Nezu':[35.7174,139.7657],
+  'Chiyoda.Sendagi':[35.7255,139.7633],'Chiyoda.NishiNippori':[35.7326,139.7672],
+  'Chiyoda.Machiya':[35.7422,139.7801],'Chiyoda.KitaSenju':[35.7497,139.8044],
+  'Chiyoda.Ayase':[35.7622,139.8249],
+  'Yurakucho.Wakoshi':[35.7884,139.6129],'Yurakucho.ChikatetsuNarimasu':[35.7767,139.6313],
+  'Yurakucho.ChikatetsuAkatsuka':[35.7700,139.6442],'Yurakucho.Heiwadai':[35.7577,139.6542],
+  'Yurakucho.Hikawadai':[35.7499,139.6651],'Yurakucho.KotakeMukaihara':[35.7430,139.6807],
+  'Yurakucho.Senkawa':[35.7383,139.6895],'Yurakucho.Kanamecho':[35.7333,139.6987],
+  'Yurakucho.Ikebukuro':[35.7297,139.7097],'Yurakucho.HigashiIkebukuro':[35.7257,139.7196],
+  'Yurakucho.Gokokuji':[35.7191,139.7275],'Yurakucho.Edogawabashi':[35.7096,139.7336],
+  'Yurakucho.Iidabashi':[35.7016,139.7436],'Yurakucho.Ichigaya':[35.6924,139.7368],
+  'Yurakucho.Kojimachi':[35.6840,139.7377],'Yurakucho.Nagatacho':[35.6780,139.7416],
+  'Yurakucho.Sakuradamon':[35.6775,139.7517],'Yurakucho.Yurakucho':[35.6760,139.7622],
+  'Yurakucho.GinzaItchome':[35.6744,139.7671],'Yurakucho.Shintomicho':[35.6707,139.7734],
+  'Yurakucho.Tsukishima':[35.6646,139.7848],'Yurakucho.Toyosu':[35.6551,139.7963],
+  'Yurakucho.Tatsumi':[35.6455,139.8107],'Yurakucho.ShinKiba':[35.6460,139.8267],
+  'Hanzomon.Shibuya':[35.6596,139.7021],'Hanzomon.Omotesando':[35.6651,139.7123],
+  'Hanzomon.AoyamaItchome':[35.6729,139.7239],'Hanzomon.Nagatacho':[35.6784,139.7386],
+  'Hanzomon.Hanzomon':[35.6852,139.7415],'Hanzomon.Kudanshita':[35.6953,139.7505],
+  'Hanzomon.Jimbocho':[35.6960,139.7569],'Hanzomon.Otemachi':[35.6868,139.7650],
+  'Hanzomon.Mitsukoshimae':[35.6850,139.7731],'Hanzomon.Suitengumae':[35.6826,139.7857],
+  'Hanzomon.KiyosumiShirakawa':[35.6821,139.7992],'Hanzomon.Sumiyoshi':[35.6887,139.8157],
+  'Hanzomon.Kinshicho':[35.6963,139.8150],'Hanzomon.Oshiage':[35.7099,139.8133],
+  'Namboku.Meguro':[35.6337,139.7156],'Namboku.Shirokanedai':[35.6381,139.7266],
+  'Namboku.ShirokaneTakanawa':[35.6430,139.7341],'Namboku.AzabuJuban':[35.6552,139.7371],
+  'Namboku.RoppongiItchome':[35.6650,139.7389],'Namboku.TameikeSanno':[35.6730,139.7413],
+  'Namboku.Nagatacho':[35.6785,139.7391],'Namboku.Yotsuya':[35.6856,139.7294],
+  'Namboku.Ichigaya':[35.6933,139.7367],'Namboku.Iidabashi':[35.7015,139.7437],
+  'Namboku.Korakuen':[35.7082,139.7518],'Namboku.Todaimae':[35.7173,139.7581],
+  'Namboku.HonKomagome':[35.7248,139.7536],'Namboku.Komagome':[35.7360,139.7467],
+  'Namboku.Nishigahara':[35.7460,139.7421],'Namboku.Oji':[35.7539,139.7374],
+  'Namboku.OjiKamiya':[35.7650,139.7357],'Namboku.Shimo':[35.7779,139.7325],
+  'Namboku.AkabaneIwabuchi':[35.7838,139.7222],
+  'Fukutoshin.Wakoshi':[35.7884,139.6129],'Fukutoshin.ChikatetsuNarimasu':[35.7767,139.6313],
+  'Fukutoshin.ChikatetsuAkatsuka':[35.7700,139.6442],'Fukutoshin.Heiwadai':[35.7577,139.6542],
+  'Fukutoshin.Hikawadai':[35.7499,139.6651],'Fukutoshin.KotakeMukaihara':[35.7429,139.6806],
+  'Fukutoshin.Senkawa':[35.7383,139.6895],'Fukutoshin.Kanamecho':[35.7333,139.6987],
+  'Fukutoshin.Ikebukuro':[35.7312,139.7090],'Fukutoshin.Zoshigaya':[35.7202,139.7147],
+  'Fukutoshin.NishiWaseda':[35.7079,139.7091],'Fukutoshin.HigashiShinjuku':[35.6989,139.7077],
+  'Fukutoshin.ShinjukuSanchome':[35.6907,139.7048],'Fukutoshin.KitaSando':[35.6785,139.7055],
+  'Fukutoshin.MeijiJingumae':[35.6684,139.7054],'Fukutoshin.Shibuya':[35.6586,139.7028],
+  'Asakusa.NishiMagome':[35.5968,139.7119],'Asakusa.Nakanobu':[35.6053,139.7136],
+  'Asakusa.Togoshi':[35.6145,139.7163],'Asakusa.Gotanda':[35.6271,139.7242],
+  'Asakusa.Takanawadai':[35.6318,139.7303],'Asakusa.Sengakuji':[35.6388,139.7400],
+  'Asakusa.Mita':[35.6472,139.7476],'Asakusa.Daimon':[35.6569,139.7547],
+  'Asakusa.Shimbashi':[35.6654,139.7594],'Asakusa.HigashiGinza':[35.6699,139.7672],
+  'Asakusa.Takaracho':[35.6754,139.7719],'Asakusa.Nihombashi':[35.6819,139.7758],
+  'Asakusa.Ningyocho':[35.6863,139.7822],'Asakusa.HigashiNihombashi':[35.6921,139.7849],
+  'Asakusa.Asakusabashi':[35.6974,139.7863],'Asakusa.Kuramae':[35.7032,139.7909],
+  'Asakusa.Asakusa':[35.7090,139.7966],'Asakusa.HonjoAzumabashi':[35.7086,139.8044],
+  'Asakusa.Oshiage':[35.7105,139.8126],
+  'Shinjuku.Shinjuku':[35.6885,139.6992],'Shinjuku.ShinjukuSanchome':[35.6906,139.7063],
+  'Shinjuku.Akebonobashi':[35.6924,139.7229],'Shinjuku.Ichigaya':[35.6915,139.7377],
+  'Shinjuku.Kudanshita':[35.6953,139.7504],'Shinjuku.Jimbocho':[35.6959,139.7584],
+  'Shinjuku.Ogawamachi':[35.6949,139.7663],'Shinjuku.Iwamotocho':[35.6955,139.7754],
+  'Shinjuku.Bakuroyokoyama':[35.6921,139.7828],'Shinjuku.Hamacho':[35.6884,139.7881],
+  'Shinjuku.Morishita':[35.6879,139.7970],'Shinjuku.Kikukawa':[35.6884,139.8061],
+  'Shinjuku.Sumiyoshi':[35.6890,139.8160],'Shinjuku.NishiOjima':[35.6893,139.8266],
+  'Shinjuku.Ojima':[35.6897,139.8351],'Shinjuku.HigashiOjima':[35.6903,139.8460],
+  'Shinjuku.Funabori':[35.6838,139.8643],'Shinjuku.Ichinoe':[35.6860,139.8831],
+  'Shinjuku.Mizue':[35.6932,139.8977],'Shinjuku.Shinozaki':[35.7060,139.9039],
+  'Shinjuku.Motoyawata':[35.7237,139.9271],
+  'Mita.NishiTakashimadaira':[35.7888,139.6613],'Mita.Nishidai':[35.7869,139.6740],
+  'Mita.Hasune':[35.7842,139.6790],'Mita.ShimuraSanchome':[35.7775,139.6860],
+  'Mita.ShimuraSakaue':[35.7757,139.6955],'Mita.Motohasunuma':[35.7685,139.7024],
+  'Mita.Itabashihoncho':[35.7614,139.7055],'Mita.ItabashiKuyakushomae':[35.7513,139.7100],
+  'Mita.ShinItabashi':[35.7487,139.7200],'Mita.NishiSugamo':[35.7435,139.7287],
+  'Mita.Sugamo':[35.7337,139.7382],'Mita.Sengoku':[35.7277,139.7449],
+  'Mita.Hakusan':[35.7215,139.7521],'Mita.Kasuga':[35.7099,139.7531],
+  'Mita.Suidobashi':[35.7035,139.7551],'Mita.Jimbocho':[35.6950,139.7582],
+  'Mita.Otemachi':[35.6840,139.7627],'Mita.Hibiya':[35.6763,139.7601],
+  'Mita.Uchisaiwaicho':[35.6695,139.7553],'Mita.Onarimon':[35.6608,139.7513],
+  'Mita.Shibakoen':[35.6542,139.7499],'Mita.Mita':[35.6481,139.7486],
+  'Mita.ShirokaneTakanawa':[35.6430,139.7340],'Mita.Shirokanedai':[35.6381,139.7266],
+  'Mita.Meguro':[35.6337,139.7156],
+  'Oedo.Hikarigaoka':[35.7627,139.6293],'Oedo.NerimaKasugacho':[35.7514,139.6404],
+  'Oedo.Toshimaen':[35.7422,139.6491],'Oedo.Nerima':[35.7374,139.6544],
+  'Oedo.ShinEgota':[35.7326,139.6704],'Oedo.OchiaiMinamiNagasaki':[35.7233,139.6836],
+  'Oedo.Nakai':[35.7140,139.6864],'Oedo.HigashiNakano':[35.7073,139.6833],
+  'Oedo.NakanoSakaue':[35.6973,139.6830],'Oedo.NishiShinjukuGochome':[35.6900,139.6848],
+  'Oedo.Tochomae':[35.6907,139.6928],'Oedo.Shinjuku':[35.6882,139.6992],
+  'Oedo.Yoyogi':[35.6836,139.7016],'Oedo.KokuritsuKyogijo':[35.6801,139.7140],
+  'Oedo.AoyamaItchome':[35.6728,139.7241],'Oedo.Roppongi':[35.6636,139.7320],
+  'Oedo.AzabuJuban':[35.6566,139.7362],'Oedo.Akabanebashi':[35.6551,139.7439],
+  'Oedo.Daimon':[35.6568,139.7554],'Oedo.Shiodome':[35.6633,139.7602],
+  'Oedo.Tsukijishijo':[35.6649,139.7669],'Oedo.Kachidoki':[35.6590,139.7771],
+  'Oedo.Tsukishima':[35.6642,139.7844],'Oedo.MonzenNakacho':[35.6726,139.7949],
+  'Oedo.Morishita':[35.6879,139.7970],'Oedo.Ryogoku':[35.6968,139.7974],
+  'Oedo.Kuramae':[35.7055,139.7924],'Oedo.ShinOkachimachi':[35.7070,139.7819],
+  'Oedo.UenoOkachimachi':[35.7079,139.7733],'Oedo.HongoSanchome':[35.7075,139.7606],
+  'Oedo.Kasuga':[35.7085,139.7527],'Oedo.Iidabashi':[35.7031,139.7458],
+  'Oedo.UshigomeKagurazaka':[35.7009,139.7360],'Oedo.UshigomeYanagicho':[35.6994,139.7256],
+  'Oedo.WakamatsuKawada':[35.6993,139.7184],'Oedo.ShinjukuNishiguchi':[35.6931,139.6992],
+};
+
+function stationKey(odptId) {
+  // "odpt.Station:TokyoMetro.Ginza.Shibuya" → "Ginza.Shibuya"
+  const colon = odptId.indexOf(':');
+  if (colon < 0) return odptId;
+  const segments = odptId.slice(colon + 1).split('.');
+  return segments.slice(-2).join('.');
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -1268,7 +1449,47 @@ if (path === '/trains/seattle') {
       }
     }
 
-    return json({ error:'Not found. Try /trains/nyc, /trains/seattle, /trains/helsinki, /trains/sydney, or /health' }, 404);
+    if (path === '/trains/tokyo') {
+      const key = env.ODPT_API_KEY;
+      if (!key) return json({ error: 'ODPT_API_KEY secret not set — run: wrangler secret put ODPT_API_KEY' }, 500);
+      const cache    = caches.default;
+      const cacheKey = new Request(request.url);
+      const staleKey = new Request(request.url + '__stale');
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
+      try {
+        const trains = await fetchTokyoTrains(key);
+        const resp = json({ city:'tokyo', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        resp.headers.append('Cache-Control', 'public, max-age=30');
+        const staleResp = resp.clone();
+        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
+        return resp;
+      } catch (e) {
+        const stale = await cache.match(staleKey);
+        if (stale) return stale;
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    if (path === '/tokyo/debug') {
+      const key = env.ODPT_API_KEY;
+      if (!key) return json({ error: 'ODPT_API_KEY not set' }, 500);
+      try {
+        const r = await withTimeout(fetch(`${ODPT_BASE}/odpt:Train?acl:consumerKey=${key}`), 10000);
+        const all = await r.json();
+        const byRailway = {};
+        const stationSamples = {};
+        for (const t of all) {
+          const rwy = t['odpt:railway'] ?? 'unknown';
+          byRailway[rwy] = (byRailway[rwy] ?? 0) + 1;
+          if (!stationSamples[rwy]) stationSamples[rwy] = { from: t['odpt:fromStation'], to: t['odpt:toStation'] };
+        }
+        return json({ total: all.length, byRailway, stationSamples });
+      } catch(e) { return json({ error: e.message }); }
+    }
+
+    return json({ error:'Not found. Try /trains/nyc, /trains/tokyo, /trains/helsinki, /trains/sydney, or /health' }, 404);
   }
 };
 
@@ -1563,6 +1784,59 @@ async function fetchSydneyTrains(apiKey) {
         stale,
       });
     }
+  }
+  return trains;
+}
+
+// ── Tokyo — ODPT Train API ────────────────────────────────────
+// Note: This API key covers Toei (Asakusa/Shinjuku/Mita/Oedo/Arakawa) +
+// Yokohama Municipal. Tokyo Metro requires a separate key.
+async function fetchTokyoTrains(apiKey) {
+  const resp = await withTimeout(
+    fetch(`${ODPT_BASE}/odpt:Train?acl:consumerKey=${apiKey}`, { cf:{ cacheTtl:15, cacheEverything:true } }),
+    10000
+  );
+  if (!resp.ok) throw new Error(`ODPT ${resp.status}`);
+  const all = await resp.json();
+  const trains = [];
+  const now = Date.now();
+
+  for (const t of all) {
+    const lineInfo = TOKYO_LINE_MAP[t['odpt:railway']];
+    if (!lineInfo) continue;
+    const fromId = t['odpt:fromStation'];
+    if (!fromId) continue;
+    const fc = TOKYO_STATIONS[stationKey(fromId)];
+    if (!fc) continue;
+
+    const toId = t['odpt:toStation'];
+    const tc   = toId ? TOKYO_STATIONS[stationKey(toId)] : null;
+
+    const updatedAt = t['dc:date'] ? new Date(t['dc:date']).getTime() : now;
+    const stale = Math.floor((now - updatedAt) / 1000);
+    if (stale > 300) continue;
+
+    // If toStation known: place at midpoint + compute bearing; else pin at fromStation
+    const lat = tc ? (fc[0] + tc[0]) / 2 : fc[0];
+    const lng = tc ? (fc[1] + tc[1]) / 2 : fc[1];
+    let bearing = null;
+    if (tc) {
+      const dLat = tc[0] - fc[0];
+      const dLng = (tc[1] - fc[1]) * Math.cos(fc[0] * Math.PI / 180);
+      bearing = Math.round((Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360);
+    }
+
+    trains.push({
+      id:      t['owl:sameAs'] ?? t['@id'],
+      line:    lineInfo.line,
+      color:   lineInfo.color,
+      lat:     Math.round(lat * 100000) / 100000,
+      lng:     Math.round(lng * 100000) / 100000,
+      bearing,
+      status:  'IN_TRANSIT',
+      source:  'odpt',
+      stale,
+    });
   }
   return trains;
 }

@@ -456,11 +456,12 @@ const CITIES = {
       { id:'Z',  name:'Hanzomon',   color:'#8F76D6' },
       { id:'N',  name:'Namboku',    color:'#00AC9B' },
       { id:'F',  name:'Fukutoshin', color:'#9C5E31' },
-      // Toei Subway (4 lines)
+      // Toei Subway (4 lines) + Arakawa Tram
       { id:'A',  name:'Asakusa',    color:'#EE4B98' },
       { id:'S',  name:'Shinjuku',   color:'#6CBB5A' },
       { id:'I',  name:'Mita',       color:'#0079C2' },
       { id:'E',  name:'Oedo',       color:'#B6007A' },
+      { id:'AR', name:'Arakawa',    color:'#DAA520' },
     ],
     routes: [
       // Ginza (G) — Shibuya → Asakusa
@@ -1124,7 +1125,7 @@ function spawnTrains() {
 }
 
 // Per-city fetch counters — reset daily
-const _fetchStats = { nyc:{ok:0,err:0}, paris:{ok:0,err:0}, seattle:{ok:0,err:0}, helsinki:{ok:0,err:0}, sydney:{ok:0,err:0} };
+const _fetchStats = { nyc:{ok:0,err:0}, paris:{ok:0,err:0}, seattle:{ok:0,err:0}, helsinki:{ok:0,err:0}, sydney:{ok:0,err:0}, tokyo:{ok:0,err:0} };
 let _statsDay = new Date().toDateString(); // tracks current calendar day
 
 function _renderFetchStats() {
@@ -1184,7 +1185,7 @@ async function fetchRealTrains() {
   // Capture cityId NOW — the fetch is async and the user may switch cities
   // before the response arrives. All state mutations check this snapshot.
   const fetchedCity = cityId;
-  if (!['nyc','paris','seattle','helsinki','sydney'].includes(fetchedCity)) return;
+  if (!['nyc','paris','seattle','helsinki','sydney','tokyo'].includes(fetchedCity)) return;
 
   _fetchInFlight = true;
   const t0 = Date.now();
@@ -1409,7 +1410,7 @@ function startRealDataPolling() {
   fetchRealTrains();
   // Poll every 15s — MTA feed updates every 30s, this catches it fast
   setInterval(() => {
-    if (['nyc','paris','seattle','helsinki','sydney'].includes(cityId)) fetchRealTrains();
+    if (['nyc','paris','seattle','helsinki','sydney','tokyo'].includes(cityId)) fetchRealTrains();
   }, 15000);
 }
 
@@ -1499,14 +1500,11 @@ function switchCity(id, btn) {
       lastJapanUpdate = 0; // force refresh on next loop tick
       document.getElementById('statusLabel').textContent =
         `Timetable · ${trains.length} trains · JR Group · JST`;
-    } else if (['nyc','paris','seattle','helsinki','sydney'].includes(id)) {
+    } else if (['nyc','paris','seattle','helsinki','sydney','tokyo'].includes(id)) {
       spawnTrains();
       document.getElementById('statusLabel').textContent = 'Connecting…';
       // Fetch immediately — don't make the user wait up to 15s for the next poll
       fetchRealTrains();
-    } else {
-      spawnTrains();
-      document.getElementById('statusLabel').textContent = 'Simulated · Tokyo Metro';
     }
     renderLegend();
     if (id === 'seattle') fetchLiveDepartures(); else updateDepartures();
@@ -1524,7 +1522,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.11', LAST_EDIT='2026-05-28 · 20:00 PT';
+const VERSION='v4.13', LAST_EDIT='2026-05-28 · 22:00 PT';
 
 function toPT(isoString) {
   if (!isoString) return '—';

@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.11 (worker w4.4)  
+> **Prototype version:** v4.13 (worker w4.6)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -23,7 +23,7 @@ An ambient, art-like live transit map showing real subway train positions across
 | Seattle | ⏳ Real trains | Sound Transit OBA | **Needs OBA key** |
 | Helsinki | ✅ Real trains | HSL GTFS-RT vehicle positions (free, no key) | **Live** |
 | Sydney | ✅ Real trains | TfNSW GTFS-RT vehicle positions (prefix route IDs: NSN/ESI/APS/etc.) | **Live** |
-| Tokyo | 🔲 Simulated | ODPT API | Not started |
+| Tokyo | ✅ Real trains | ODPT API (TokyoMetro + Toei, JSON, station midpoint interpolation) | **Live** |
 | Shinkansen | ✅ Timetable-driven | Official JR schedules (all lines) | **Live** |
 
 ---
@@ -296,6 +296,8 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v4.13 | Tokyo: fix ODPT URL (v4 not 4), single-fetch all operators, handle null toStation, add Arakawa tram — worker w4.6; note: key covers Toei only (no TokyoMetro) |
+| 2026-05-28 | v4.12 | Tokyo: switch from simulated to real ODPT data (ODPT JSON API, station midpoint positioning) — worker w4.5 |
 | 2026-05-28 | v4.11 | Helsinki Metro: M2 now red (#E4003A) to distinguish from M1 orange — worker w4.4 |
 | 2026-05-28 | v4.10 | Helsinki: add trams (1–15, green) + commuter rail (I/K/L/P/R/T/U/X/Y/Z) with individual colors + route paths — worker w4.3 |
 | 2026-05-28 | v4.9 | Fix Sydney route ID matching — TfNSW uses prefix format (NSN_, ESI_, APS_, etc.) not T1/T4; added T3/T5/T9 to legend; 134 trains live |
