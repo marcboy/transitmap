@@ -15,7 +15,7 @@ function parseTs(s) {
   return v;
 }
 
-const WORKER_VERSION = 'w4.2';
+const WORKER_VERSION = 'w4.3';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -1001,14 +1001,43 @@ const SEATTLE_LINE_COLORS = {
   'T-Line': '#028A0F',  // Green (Tacoma Link)
 };
 
-// Helsinki — HSL Metro via Digitransit GTFS-RT vehicle positions (no API key)
+// Helsinki — HSL Metro, Trams & Commuter Rail via Digitransit GTFS-RT (no API key)
 const HSL_FEED = 'https://realtime.hsl.fi/realtime/vehicle-positions/v2/hsl';
+
+// Exact-match map for Metro + Trams
 const HELSINKI_LINE_MAP = {
-  '31M1': { line:'M1', color:'#FF6319' },
-  '31M1B':{ line:'M1', color:'#FF6319' },
-  '31M2': { line:'M2', color:'#FF6319' },
-  '31M2B':{ line:'M2', color:'#FF6319' },
+  // Metro (orange)
+  '31M1':  { line:'M1',  color:'#FF6319' },
+  '31M1B': { line:'M1',  color:'#FF6319' },
+  '31M2':  { line:'M2',  color:'#FF6319' },
+  '31M2B': { line:'M2',  color:'#FF6319' },
+  // Trams (HSL green) — agency 1, 3-digit route number
+  '1001':  { line:'1',   color:'#007A33' },
+  '1002':  { line:'2',   color:'#007A33' },
+  '1003':  { line:'3',   color:'#007A33' },
+  '1004':  { line:'4',   color:'#007A33' },
+  '1006':  { line:'6',   color:'#007A33' },
+  '1007':  { line:'7',   color:'#007A33' },
+  '1008':  { line:'8',   color:'#007A33' },
+  '1009':  { line:'9',   color:'#007A33' },
+  '1010':  { line:'10',  color:'#007A33' },
+  '1013':  { line:'13',  color:'#007A33' },
+  '1014':  { line:'14',  color:'#007A33' },
+  '1015':  { line:'15',  color:'#007A33' },
 };
+
+// Commuter rail: route IDs are 300[12][LETTER] e.g. 3001R, 3002L, 3001K
+const COMMUTER_COLORS = {
+  'I':'#00B050', 'K':'#9B2335', 'L':'#F79239', 'P':'#0070C0',
+  'R':'#E31837', 'T':'#00885A', 'U':'#F5A623', 'X':'#4A90D9',
+  'Y':'#00B050', 'Z':'#9B2335',
+};
+function helsinkiCommuterInfo(routeId) {
+  const m = routeId.match(/^300[12]([A-Z]+)$/);
+  if (!m) return null;
+  const letter = m[1];
+  return { line: letter, color: COMMUTER_COLORS[letter] ?? '#8B4513' };
+}
 
 // Sydney — TfNSW GTFS-RT vehicle positions (API key required)
 // Set secret: wrangler secret put TFN_API_KEY
@@ -1148,6 +1177,22 @@ if (path === '/trains/seattle') {
       } catch(e) {
         return json({ error: e.message }, 500);
       }
+    }
+
+    if (path === '/helsinki/debug') {
+      try {
+        const resp = await withTimeout(fetch(HSL_FEED, { cf:{ cacheTtl:0 } }), 10000);
+        if (!resp.ok) return json({ status: resp.status });
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        const entities = decodeFeed(bytes);
+        const routeIds = {};
+        for (const e of entities) {
+          const rid = e.vehicle?.trip?.routeId ?? '(none)';
+          routeIds[rid] = (routeIds[rid] ?? 0) + 1;
+        }
+        const sorted = Object.entries(routeIds).sort((a,b) => b[1]-a[1]).slice(0, 50);
+        return json({ total: entities.length, routeIdCounts: Object.fromEntries(sorted) });
+      } catch(e) { return json({ error: e.message }); }
     }
 
     if (path === '/sydney/debug') {
@@ -1451,7 +1496,7 @@ async function fetchHelsinkiTrains() {
     if (!v?.position) continue;
 
     const routeId = v.trip?.routeId ?? '';
-    const info    = HELSINKI_LINE_MAP[routeId];
+    const info    = HELSINKI_LINE_MAP[routeId] ?? helsinkiCommuterInfo(routeId);
     if (!info) continue;
 
     const stale = now - (v.timestamp ?? now);
