@@ -1,6 +1,6 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-29 · 14:37 PT
+> **Last updated:** 2026-05-29 · 14:40 PT
 > **Prototype version:** v4.20 · **Worker version:** w4.9
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
@@ -357,6 +357,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-29 | — | LG webOS: version stamp 10px→13px (readable on TV); worker version pre-populated at build time (visible immediately, not just after first fetch) |
 | 2026-05-29 | w4.9 | Paris 503 fix: O(n) time-window pre-filter skips past/future journeys before sort; fresh cache 60s→120s; ~10× CPU reduction eliminates CPU-limit kills |
 | 2026-05-29 | — | LG webOS: screensaver prevention — Luna service `changeScreenSaverSettings` + synthetic mousemove every 60s; fixes screen going black during ambient display |
 | 2026-05-29 | w4.8 | Worker: stale TTL 300s→86400s for all cities (24h cache survives TV idle); add two-tier caching to Seattle (had none); eliminates LG TV 503s |

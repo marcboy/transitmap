@@ -17,7 +17,17 @@ const ROOT      = path.resolve(__dirname, '../..');
 const PROTO     = path.join(ROOT, 'prototype/transitmap-prototype.html');
 const PLATFORM  = path.join(ROOT, 'platforms/shared/platform.js');
 const TV_NAV    = path.join(ROOT, 'platforms/samsung/tv-nav.js'); // shared with Samsung
+const WORKER    = path.join(ROOT, 'cloudflare-worker/index.js');
 const OUT       = path.join(__dirname, 'index.html');
+
+// Read worker version from the worker source so the stamp is always in sync
+function readWorkerVersion() {
+  try {
+    const src = fs.readFileSync(WORKER, 'utf8');
+    const m = src.match(/WORKER_VERSION\s*=\s*'([^']+)'/);
+    return m ? m[1] : 'unknown';
+  } catch { return 'unknown'; }
+}
 
 // ── TV CSS — injected just before </style> ────────────────────────────────────
 const TV_CSS = `
@@ -34,6 +44,8 @@ const TV_CSS = `
   .status-pill { font-size: 14px; padding: 10px 20px; }
   .line-chip { font-size: 14px; padding: 6px 14px 6px 8px; }
   .line-dot  { width: 13px; height: 13px; }
+  /* Version stamps — readable at 10-foot viewing distance */
+  .version-stamp { font-size: 13px; }
   /* Hide elements that don't work on TV */
   #departures-panel { display: none !important; }
   /* Theme button is pointless on TV (always dark) */
@@ -101,6 +113,9 @@ function build() {
     process.exit(1);
   }
 
+  const workerVersion = readWorkerVersion();
+  const buildTime     = new Date().toISOString();
+
   let html = fs.readFileSync(PROTO, 'utf8');
   const platformJs = fs.readFileSync(PLATFORM, 'utf8');
   const tvNavJs    = fs.existsSync(TV_NAV) ? fs.readFileSync(TV_NAV, 'utf8') : '';
@@ -122,6 +137,12 @@ if (typeof Platform !== 'undefined') {
   Platform.init();
   if (typeof initTVNav === 'function') initTVNav();
 }
+
+// ── Pre-populate worker stamp so version is visible before first fetch ────────
+(function() {
+  const ws = document.getElementById('workerStamp');
+  if (ws) ws.textContent = '${workerVersion} · built ${buildTime.slice(0,10)}';
+})();
 
 // ── LG webOS: prevent screensaver / auto-off ─────────────────────────────────
 // Two-pronged: (1) Luna service disables the system screensaver; (2) synthetic
@@ -156,7 +177,7 @@ if (typeof Platform !== 'undefined') {
 
   fs.writeFileSync(OUT, html, 'utf8');
   console.log(`[${new Date().toLocaleTimeString()}] Built → platforms/lg-webos/index.html`);
-  console.log(`  Size: ${(html.length / 1024).toFixed(1)} KB`);
+  console.log(`  Worker: ${workerVersion}  Size: ${(html.length / 1024).toFixed(1)} KB`);
 }
 
 build();
