@@ -44,6 +44,19 @@
   .city-more-wrap select option { background:#0d1425; color:#e8edf5; }
   .city-more-wrap::after { content:'▾'; position:absolute; right:10px; color:rgba(255,255,255,0.4); pointer-events:none; font-size:9px; }
 
+  .unlock-overlay { position:absolute; inset:0; background:rgba(4,8,18,0.82); z-index:800; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(10px); opacity:0; pointer-events:none; transition:opacity 0.25s; }
+  .unlock-overlay.visible { opacity:1; pointer-events:auto; }
+  .unlock-card { background:rgba(14,20,38,0.96); border:1px solid rgba(255,255,255,0.14); border-radius:24px; padding:36px 40px; max-width:360px; width:90%; text-align:center; }
+  .unlock-icon { font-size:36px; margin-bottom:14px; }
+  .unlock-title { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; color:#fff; margin-bottom:8px; }
+  .unlock-desc { font-size:12px; color:rgba(255,255,255,0.55); line-height:1.7; margin-bottom:20px; }
+  .unlock-cities { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:28px; }
+  .unlock-city-chip { font-size:11px; padding:5px 13px; border-radius:14px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.8); }
+  .unlock-btn { font-family:'DM Mono',monospace; font-size:13px; padding:13px 0; border-radius:24px; border:none; cursor:pointer; background:#fff; color:#080c14; font-weight:500; width:100%; margin-bottom:12px; transition:opacity 0.2s; }
+  .unlock-btn:hover { opacity:0.88; }
+  .unlock-dismiss { font-size:11px; color:rgba(255,255,255,0.35); background:none; border:none; cursor:pointer; font-family:'DM Mono',monospace; letter-spacing:0.5px; }
+  .unlock-dismiss:hover { color:rgba(255,255,255,0.6); }
+
   .legend { position:absolute; bottom:0; left:0; right:0; padding:28px 32px; background:linear-gradient(to top,rgba(8,12,20,0.92) 0%,transparent 100%); z-index:500; display:flex; align-items:flex-end; justify-content:space-between; }
   .lines-row { display:flex; flex-wrap:wrap; gap:5px; max-width:70%; }
   .line-chip { display:flex; align-items:center; gap:5px; padding:4px 10px 4px 6px; border-radius:20px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); font-size:11px; color:rgba(255,255,255,0.9); }
@@ -98,13 +111,6 @@
   <div class="city-more-wrap">
     <select id="cityDropdown" onchange="if(this.value){pickCity(this.value);this.value='';}">
       <option value="">More ▾</option>
-      <option value="nyc">🇺🇸 New York</option>
-      <option value="paris">🇫🇷 Paris</option>
-      <option value="seattle">🇺🇸 Seattle</option>
-      <option value="helsinki">🇫🇮 Helsinki</option>
-      <option value="sydney">🇦🇺 Sydney</option>
-      <option value="tokyo">🇯🇵 Tokyo</option>
-      <option value="japan">🚄 Shinkansen</option>
     </select>
   </div>
 </div>
@@ -139,6 +145,16 @@
   <div class="dep-header"><div class="dep-line-dot"></div>2 Line &middot; South Bellevue &rarr; Westlake</div>
   <div id="dep-rows"></div>
   <div class="dep-source">Scheduled</div>
+</div>
+<div class="unlock-overlay" id="unlockOverlay" onclick="if(event.target===this)hideUnlockModal()">
+  <div class="unlock-card">
+    <div class="unlock-icon">🔒</div>
+    <div class="unlock-title">Premium Cities</div>
+    <div class="unlock-desc">Unlock 4 more cities with real-time live data.</div>
+    <div class="unlock-cities" id="unlockCityList"></div>
+    <button class="unlock-btn" onclick="unlockPremium()">Unlock All Cities</button>
+    <button class="unlock-dismiss" onclick="hideUnlockModal()">Not now</button>
+  </div>
 </div>
 <div class="fade-cover" id="fadeCover"></div>
 
@@ -1258,28 +1274,80 @@ function spawnTrains() {
 }
 
 // Per-city fetch counters — reset daily
-// ── CITY SWITCHER STATE ───────────────────────────────────────
+// ── CITY TIERS ───────────────────────────────────────────────
+// FREE_CITIES are included in the base app purchase.
+// PREMIUM_CITIES require the "All Cities" in-app purchase.
+// Edit these two arrays to change which cities are in each tier.
 const ALL_CITIES_LIST = [
   { id:'nyc',     label:'🇺🇸 New York'  },
   { id:'paris',   label:'🇫🇷 Paris'     },
+  { id:'tokyo',   label:'🇯🇵 Tokyo'     },
   { id:'seattle', label:'🇺🇸 Seattle'   },
   { id:'helsinki',label:'🇫🇮 Helsinki'  },
   { id:'sydney',  label:'🇦🇺 Sydney'    },
-  { id:'tokyo',   label:'🇯🇵 Tokyo'     },
   { id:'japan',   label:'🚄 Shinkansen' },
 ];
-let recentCities = ['nyc','paris','tokyo']; // most-recent first, max 3
+const FREE_CITIES    = ['nyc', 'paris', 'tokyo'];
+const PREMIUM_CITIES = ['seattle', 'helsinki', 'sydney', 'japan'];
+
+// Persisted across sessions. In the native app, set via IAP receipt validation.
+let premiumUnlocked = localStorage.getItem('transitmap_premium') === '1';
+
+function isCityUnlocked(id) {
+  return FREE_CITIES.includes(id) || premiumUnlocked;
+}
+
+// ── IAP integration point ─────────────────────────────────────
+// Swift calls this after a successful purchase or restore:
+//   webView.evaluateJavaScript("unlockPremium()")
+// Also used for "Restore Purchases" — same call.
+function unlockPremium() {
+  premiumUnlocked = true;
+  localStorage.setItem('transitmap_premium', '1');
+  hideUnlockModal();
+  renderCitySwitcher();
+}
+
+function showUnlockModal() {
+  document.getElementById('unlockCityList').innerHTML =
+    PREMIUM_CITIES.map(id => {
+      const c = ALL_CITIES_LIST.find(x => x.id === id);
+      return c ? `<span class="unlock-city-chip">${c.label}</span>` : '';
+    }).join('');
+  document.getElementById('unlockOverlay').classList.add('visible');
+}
+
+function hideUnlockModal() {
+  document.getElementById('unlockOverlay').classList.remove('visible');
+}
+
+// ── CITY SWITCHER STATE ───────────────────────────────────────
+let recentCities = FREE_CITIES.slice(); // start with all free cities as recents
 
 function renderCitySwitcher() {
-  document.getElementById('recentBtns').innerHTML = recentCities.map(id => {
+  // Recent buttons: only show unlocked cities
+  const visibleRecents = recentCities.filter(id => isCityUnlocked(id));
+  document.getElementById('recentBtns').innerHTML = visibleRecents.map(id => {
     const c = ALL_CITIES_LIST.find(x => x.id === id);
     if (!c) return '';
     return `<button class="city-btn${id===cityId?' active':''}" onclick="pickCity('${id}')">${c.label}</button>`;
   }).join('');
+
+  // Dropdown: all cities; locked ones prefixed with 🔒
+  // "Unlock" option appended at the bottom when premium is not yet purchased
+  document.getElementById('cityDropdown').innerHTML =
+    '<option value="">More ▾</option>' +
+    ALL_CITIES_LIST.map(c => {
+      const locked = !isCityUnlocked(c.id);
+      return `<option value="${c.id}">${locked ? '🔒 ' : ''}${c.label}</option>`;
+    }).join('') +
+    (premiumUnlocked ? '' : '<option value="__unlock__">🔓 Unlock All Cities…</option>');
 }
 
 function pickCity(id) {
   if (!id) return;
+  if (id === '__unlock__') { showUnlockModal(); return; }
+  if (!isCityUnlocked(id)) { showUnlockModal(); return; }
   recentCities = [id, ...recentCities.filter(c => c !== id)].slice(0, 3);
   switchCity(id);
 }
@@ -1702,7 +1770,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.18', LAST_EDIT='2026-05-28 · 20:14 PT';
+const VERSION='v4.19', LAST_EDIT='2026-05-28 · 20:20 PT';
 
 function toPT(isoString) {
   if (!isoString) return '—';

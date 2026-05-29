@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.18 (worker w4.7)  
+> **Prototype version:** v4.19 (worker w4.7)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -296,6 +296,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v4.19 | City tier system: FREE_CITIES (NYC/Paris/Tokyo) + PREMIUM_CITIES (Seattle/Helsinki/Sydney/Shinkansen); unlockPremium() is Swift IAP callback; locked cities show 🔒 in dropdown; unlock modal |
 | 2026-05-28 | v4.18 | Light mode polish: switch tile to CartoDB Voyager (clear blue water); reduce train glow radius+opacity; softer route lines; dark rim on dots in light mode |
 | 2026-05-28 | v4.17 | Light/dark map toggle — ☀/🌑 button in topbar; CartoDB Voyager (grey city, blue water) vs dark_all; tint + fade-cover color switch on toggle |
 | 2026-05-28 | v4.16 | Helsinki: add routes for 7 missing commuter lines (I/L/P/T/X/Y/Z share tracks with K/R/U); replace 4 crude tram segments with 5 accurate inner-city corridors; worker w4.7 maps all trams to 'tram' |
