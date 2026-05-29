@@ -15,7 +15,7 @@ function parseTs(s) {
   return v;
 }
 
-const WORKER_VERSION = 'w4.6';
+const WORKER_VERSION = 'w4.7';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -1011,19 +1011,19 @@ const HELSINKI_LINE_MAP = {
   '31M1B': { line:'M1',  color:'#FF6319' },
   '31M2':  { line:'M2',  color:'#E4003A' },
   '31M2B': { line:'M2',  color:'#E4003A' },
-  // Trams (HSL green) — agency 1, 3-digit route number
-  '1001':  { line:'1',   color:'#007A33' },
-  '1002':  { line:'2',   color:'#007A33' },
-  '1003':  { line:'3',   color:'#007A33' },
-  '1004':  { line:'4',   color:'#007A33' },
-  '1006':  { line:'6',   color:'#007A33' },
-  '1007':  { line:'7',   color:'#007A33' },
-  '1008':  { line:'8',   color:'#007A33' },
-  '1009':  { line:'9',   color:'#007A33' },
-  '1010':  { line:'10',  color:'#007A33' },
-  '1013':  { line:'13',  color:'#007A33' },
-  '1014':  { line:'14',  color:'#007A33' },
-  '1015':  { line:'15',  color:'#007A33' },
+  // Trams — all grouped as 'tram' so they match the single tram route network in the prototype
+  '1001':  { line:'tram', color:'#007A33' },
+  '1002':  { line:'tram', color:'#007A33' },
+  '1003':  { line:'tram', color:'#007A33' },
+  '1004':  { line:'tram', color:'#007A33' },
+  '1006':  { line:'tram', color:'#007A33' },
+  '1007':  { line:'tram', color:'#007A33' },
+  '1008':  { line:'tram', color:'#007A33' },
+  '1009':  { line:'tram', color:'#007A33' },
+  '1010':  { line:'tram', color:'#007A33' },
+  '1013':  { line:'tram', color:'#007A33' },
+  '1014':  { line:'tram', color:'#007A33' },
+  '1015':  { line:'tram', color:'#007A33' },
 };
 
 // Commuter rail: route IDs are 300[12][LETTER] e.g. 3001R, 3002L, 3001K
