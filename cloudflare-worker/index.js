@@ -15,7 +15,7 @@ function parseTs(s) {
   return v;
 }
 
-const WORKER_VERSION = 'w4.1';
+const WORKER_VERSION = 'w4.2';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -1001,6 +1001,36 @@ const SEATTLE_LINE_COLORS = {
   'T-Line': '#028A0F',  // Green (Tacoma Link)
 };
 
+// Helsinki — HSL Metro via Digitransit GTFS-RT vehicle positions (no API key)
+const HSL_FEED = 'https://realtime.hsl.fi/realtime/vehicle-positions/v2/hsl';
+const HELSINKI_LINE_MAP = {
+  '31M1': { line:'M1', color:'#FF6319' },
+  '31M1B':{ line:'M1', color:'#FF6319' },
+  '31M2': { line:'M2', color:'#FF6319' },
+  '31M2B':{ line:'M2', color:'#FF6319' },
+};
+
+// Sydney — TfNSW GTFS-RT vehicle positions (API key required)
+// Set secret: wrangler secret put TFN_API_KEY
+const TFN_TRAINS_FEED = 'https://api.transport.nsw.gov.au/v2/gtfs/vehiclepos/sydneytrains';
+const TFN_METRO_FEED  = 'https://api.transport.nsw.gov.au/v2/gtfs/vehiclepos/metro';
+// TfNSW uses prefix_variant route IDs (e.g. "NSN_2k", "ESI_1a").
+// Split on '_' and match the prefix.
+const SYDNEY_LINE_MAP = {
+  'NSN':  { line:'T1', color:'#F9E200' }, // North Shore Network
+  'BMT':  { line:'T1', color:'#F9E200' }, // Blue Mountains
+  'WST':  { line:'T1', color:'#F9E200' }, // Western
+  'RTTA': { line:'T1', color:'#F9E200' }, // Main T1 corridor
+  'CCN':  { line:'T1', color:'#F9E200' }, // Central Coast & Newcastle
+  'IWL':  { line:'T2', color:'#00954C' }, // Inner West & Leppington
+  'T3':   { line:'T3', color:'#00954C' }, // Bankstown
+  'ESI':  { line:'T4', color:'#005BAA' }, // Eastern Suburbs & Illawarra
+  'SCO':  { line:'T4', color:'#005BAA' }, // South Coast (Illawarra extension)
+  'CMB':  { line:'T5', color:'#8B0099' }, // Cumberland
+  'APS':  { line:'T8', color:'#C50023' }, // Airport & South
+  'NTH':  { line:'T9', color:'#00888A' }, // Northern
+};
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -1120,7 +1150,80 @@ if (path === '/trains/seattle') {
       }
     }
 
-    return json({ error:'Not found. Try /trains/nyc, /trains/seattle, or /health' }, 404);
+    if (path === '/sydney/debug') {
+      const key = env.TFN_API_KEY;
+      if (!key) return json({ error: 'TFN_API_KEY not set' }, 500);
+      try {
+        const headers = { 'Authorization': `apikey ${key}` };
+        const resp = await withTimeout(fetch(TFN_TRAINS_FEED, { headers }), 8000);
+        if (!resp.ok) return json({ status: resp.status });
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        const entities = decodeFeed(bytes);
+        const routeIds = {};
+        for (const e of entities) {
+          const rid = e.vehicle?.trip?.routeId ?? '(none)';
+          routeIds[rid] = (routeIds[rid] ?? 0) + 1;
+        }
+        const sorted = Object.entries(routeIds).sort((a,b) => b[1]-a[1]).slice(0, 30);
+        // Also sample metro feed
+        const mr = await withTimeout(fetch(TFN_METRO_FEED, { headers }), 8000);
+        const metroIds = {};
+        if (mr.ok) {
+          const mb = new Uint8Array(await mr.arrayBuffer());
+          for (const e of decodeFeed(mb)) {
+            const rid = e.vehicle?.trip?.routeId ?? '(none)';
+            metroIds[rid] = (metroIds[rid] ?? 0) + 1;
+          }
+        }
+        return json({ total: entities.length, routeIdCounts: Object.fromEntries(sorted), metroRouteIds: metroIds });
+      } catch(e) { return json({ error: e.message }); }
+    }
+
+    if (path === '/trains/helsinki') {
+      const cache    = caches.default;
+      const cacheKey = new Request(request.url);
+      const staleKey = new Request(request.url + '__stale');
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
+      try {
+        const trains = await fetchHelsinkiTrains();
+        const resp = json({ city:'helsinki', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        resp.headers.append('Cache-Control', 'public, max-age=15');
+        const staleResp = resp.clone();
+        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
+        return resp;
+      } catch (e) {
+        const stale = await cache.match(staleKey);
+        if (stale) return stale;
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    if (path === '/trains/sydney') {
+      const key = env.TFN_API_KEY;
+      if (!key) return json({ error: 'TFN_API_KEY secret not set — run: wrangler secret put TFN_API_KEY' }, 500);
+      const cache    = caches.default;
+      const cacheKey = new Request(request.url);
+      const staleKey = new Request(request.url + '__stale');
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
+      try {
+        const trains = await fetchSydneyTrains(key);
+        const resp = json({ city:'sydney', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        resp.headers.append('Cache-Control', 'public, max-age=15');
+        const staleResp = resp.clone();
+        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
+        return resp;
+      } catch (e) {
+        const stale = await cache.match(staleKey);
+        if (stale) return stale;
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    return json({ error:'Not found. Try /trains/nyc, /trains/seattle, /trains/helsinki, /trains/sydney, or /health' }, 404);
   }
 };
 
@@ -1329,6 +1432,94 @@ async function fetchSouthBellevueDepartures(apiKey) {
         headsign:  a.tripHeadsign ?? 'Westlake',
       };
     });
+}
+
+// ── Helsinki — HSL Metro via Digitransit GTFS-RT ─────────────
+// Free, no API key. All HSL vehicles in one feed; we filter by metro route_id.
+
+async function fetchHelsinkiTrains() {
+  const resp = await withTimeout(fetch(HSL_FEED, { cf:{ cacheTtl:15, cacheEverything:true } }), 8000);
+  if (!resp.ok) throw new Error(`HSL feed ${resp.status}`);
+
+  const bytes   = new Uint8Array(await resp.arrayBuffer());
+  const entities = decodeFeed(bytes);
+  const trains  = [];
+  const now     = Math.floor(Date.now() / 1000);
+
+  for (const entity of entities) {
+    const v = entity.vehicle;
+    if (!v?.position) continue;
+
+    const routeId = v.trip?.routeId ?? '';
+    const info    = HELSINKI_LINE_MAP[routeId];
+    if (!info) continue;
+
+    const stale = now - (v.timestamp ?? now);
+    if (stale > 180) continue;
+
+    trains.push({
+      id:      entity.id,
+      line:    info.line,
+      color:   info.color,
+      lat:     Math.round(v.position.latitude  * 100000) / 100000,
+      lng:     Math.round(v.position.longitude * 100000) / 100000,
+      bearing: v.position.bearing ? Math.round(v.position.bearing) : null,
+      status:  ['INCOMING','AT_STOP','IN_TRANSIT'][v.currentStatus] ?? 'IN_TRANSIT',
+      source:  'gps',
+      stale,
+    });
+  }
+  return trains;
+}
+
+// ── Sydney — Transport for NSW GTFS-RT ───────────────────────
+// Requires TFN_API_KEY secret. Fetches trains + metro feeds in parallel.
+
+async function fetchSydneyTrains(apiKey) {
+  const headers = { 'Authorization': `apikey ${apiKey}` };
+  const [trainsRes, metroRes] = await Promise.allSettled([
+    withTimeout(fetch(TFN_TRAINS_FEED, { headers, cf:{ cacheTtl:15, cacheEverything:true } }), 8000),
+    withTimeout(fetch(TFN_METRO_FEED,  { headers, cf:{ cacheTtl:15, cacheEverything:true } }), 8000),
+  ]);
+
+  const trains = [];
+  const seen   = new Set();
+  const now    = Math.floor(Date.now() / 1000);
+
+  for (const result of [trainsRes, metroRes]) {
+    if (result.status !== 'fulfilled' || !result.value.ok) continue;
+    const bytes    = new Uint8Array(await result.value.arrayBuffer());
+    const entities = decodeFeed(bytes);
+
+    for (const entity of entities) {
+      const v = entity.vehicle;
+      if (!v?.position) continue;
+
+      const routeId = v.trip?.routeId ?? '';
+      const prefix  = routeId.split('_')[0];
+      const info    = SYDNEY_LINE_MAP[prefix];
+      if (!info) continue;
+
+      if (seen.has(entity.id)) continue;
+      seen.add(entity.id);
+
+      const stale = now - (v.timestamp ?? now);
+      if (stale > 300) continue;
+
+      trains.push({
+        id:      entity.id,
+        line:    info.line,
+        color:   info.color,
+        lat:     Math.round(v.position.latitude  * 100000) / 100000,
+        lng:     Math.round(v.position.longitude * 100000) / 100000,
+        bearing: v.position.bearing ? Math.round(v.position.bearing) : null,
+        status:  ['INCOMING','AT_STOP','IN_TRANSIT'][v.currentStatus] ?? 'IN_TRANSIT',
+        source:  'gps',
+        stale,
+      });
+    }
+  }
+  return trains;
 }
 
 // ── Fetch all MTA feeds concurrently ─────────────────────────

@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.6 (worker w4.1)  
+> **Prototype version:** v4.9 (worker w4.2)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -10,7 +10,7 @@
 
 ## What This Is
 
-An ambient, art-like live transit map showing real subway train positions across multiple cities. Designed as a beautiful background display for Apple TV, smart TVs, lobbies, and homes. Revenue from programmatic ads (Google AdMob) shown in split-screen every 5 minutes.
+An ambient, art-like live transit map showing real subway train positions across multiple cities. Designed as a beautiful background display for Apple TV, smart TVs, lobbies, and homes.
 
 ---
 
@@ -21,6 +21,8 @@ An ambient, art-like live transit map showing real subway train positions across
 | New York | ✅ Real trains | MTA GTFS-RT (free, no key) | **Live** |
 | Paris | ✅ Real trains | IDFM PRIM SIRI Lite estimated-timetable | **Live** |
 | Seattle | ⏳ Real trains | Sound Transit OBA | **Needs OBA key** |
+| Helsinki | ✅ Real trains | HSL GTFS-RT vehicle positions (free, no key) | **Live** |
+| Sydney | ✅ Real trains | TfNSW GTFS-RT vehicle positions (prefix route IDs: NSN/ESI/APS/etc.) | **Live** |
 | Tokyo | 🔲 Simulated | ODPT API | Not started |
 | Shinkansen | ✅ Timetable-driven | Official JR schedules (all lines) | **Live** |
 
@@ -294,6 +296,9 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v4.9 | Fix Sydney route ID matching — TfNSW uses prefix format (NSN_, ESI_, APS_, etc.) not T1/T4; added T3/T5/T9 to legend; 134 trains live |
+| 2026-05-28 | v4.8 | Add Helsinki (HSL Metro M1/M2, free GTFS-RT) and Sydney (TfNSW T1/T2/T4/T8/Metro M1) — prototype routes + city buttons + worker w4.2 fetch functions |
+| 2026-05-28 | v4.7 | Remove ad system — all ad CSS, HTML panel, and JS scheduling removed; fade-cover retained for city-switch transition |
 | 2026-05-28 | v4.6 | Fix version stamp format consistency: both lines now use YYYY-MM-DD · HH:MM PT (toPT() was producing MM/DD/YYYY format via toLocaleString) |
 | 2026-05-28 | v4.5 | Version stamp: added second line showing worker version + data timestamp in PT (e.g. "w4.1 · data 05/28/2026 · 15:44 PT"). Worker now returns workerVersion field in all city responses; WORKER_VERSION constant added to worker. Prototype uses toPT() helper (Intl.DateTimeFormat with America/Los_Angeles) to convert updatedAt UTC → PT |
 | 2026-05-28 | v4.4 | Paris animation rework — snap-to-route: instead of projecting both segment endpoints to route T values (caused jumps on symmetric/curved lines), now interpolates position in lat/lng space between the two stop coordinates, then snaps the interpolated point to the nearest point on the route polyline each frame. Simpler, more robust, eliminates wrong-direction and wrong-section artifacts. Added snapToRoute() helper; removed segTA/segTB |
