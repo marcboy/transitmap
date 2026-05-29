@@ -15,7 +15,7 @@ function parseTs(s) {
   return v;
 }
 
-const WORKER_VERSION = 'w4.9';
+const WORKER_VERSION = 'w4.10';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -1252,30 +1252,29 @@ export default {
 
 
     if (path === '/trains/nyc') {
-      // Two-tier cache: 30s fresh + 300s stale fallback.
-      // Protobuf decode of 8 MTA feeds is CPU-heavy; if cache expires and compute
-      // fails (CPU limit 1102), serve stale rather than letting the failure loop
-      // self-reinforce (failed compute → cache never populated → next miss → loop).
       const cache    = caches.default;
       const cacheKey = new Request(request.url);
       const staleKey = new Request(request.url + '__stale');
       const hit      = await cache.match(cacheKey);
       if (hit) return hit;
-
       try {
         const trains = await fetchAllMTATrains();
-        const resp      = json({ city:'nyc', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'nyc', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=30');
         const staleResp = resp.clone();
         staleResp.headers.set('Cache-Control', 'public, max-age=86400');
         ctx.waitUntil(Promise.all([
           cache.put(cacheKey, resp.clone()),
           cache.put(staleKey, staleResp),
+          env.TRAIN_CACHE?.put('trains_nyc', body, { expirationTtl: 86400 }),
         ]));
         return resp;
       } catch (e) {
         const stale = await cache.match(staleKey);
         if (stale) return stale;
+        const kv = env.TRAIN_CACHE ? await env.TRAIN_CACHE.get('trains_nyc') : null;
+        if (kv) return new Response(kv, { headers: { 'Content-Type':'application/json', ...CORS } });
         return json({ error: e.message }, 500);
       }
     }
@@ -1283,32 +1282,31 @@ export default {
     if (path === '/trains/paris') {
       const key = env.IDFM_API_KEY;
       if (!key) return json({ error: 'IDFM_API_KEY secret not set' }, 500);
-
-      // Two-tier cache: 60s fresh key + 300s stale-fallback key.
-      // On thundering herd (cache miss) the compute may hit the 10ms CPU limit;
-      // the stale key lets us serve the last good response instead of a 503.
-      const cache     = caches.default;
-      const cacheKey  = new Request(request.url);
-      const staleKey  = new Request(request.url + '__stale');
+      const cache    = caches.default;
+      const cacheKey = new Request(request.url);
+      const staleKey = new Request(request.url + '__stale');
       const hit = await cache.match(cacheKey);
       if (hit) return hit;
-
-      _tsCache.clear(); // reset memo for this compute cycle
+      _tsCache.clear();
       try {
         const trains = await fetchParisTrains(key);
-        const resp   = json({ city:'paris', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'paris', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=120');
         const staleResp = resp.clone();
         staleResp.headers.set('Cache-Control', 'public, max-age=86400');
         ctx.waitUntil(Promise.all([
           cache.put(cacheKey, resp.clone()),
           cache.put(staleKey, staleResp),
+          env.TRAIN_CACHE?.put('trains_paris', body, { expirationTtl: 86400 }),
         ]));
         return resp;
       } catch (e) {
-        // Serve stale on failure (thundering herd / CPU limit / PRIM outage)
+        // Three-tier fallback: edge stale → KV (survives deployments) → error
         const stale = await cache.match(staleKey);
         if (stale) return stale;
+        const kv = env.TRAIN_CACHE ? await env.TRAIN_CACHE.get('trains_paris') : null;
+        if (kv) return new Response(kv, { headers: { 'Content-Type':'application/json', ...CORS } });
         return json({ error: e.message }, 500);
       }
     }
@@ -1348,15 +1346,18 @@ if (path === '/trains/seattle') {
       if (hit) return hit;
       try {
         const trains = await fetchSeattleTrains(key);
-        const resp = json({ city:'seattle', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'seattle', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=15');
         const staleResp = resp.clone();
         staleResp.headers.set('Cache-Control', 'public, max-age=86400');
-        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
+        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp), env.TRAIN_CACHE?.put('trains_seattle', body, { expirationTtl: 86400 })]));
         return resp;
       } catch (e) {
         const stale = await cache.match(staleKey);
         if (stale) return stale;
+        const kv = env.TRAIN_CACHE ? await env.TRAIN_CACHE.get('trains_seattle') : null;
+        if (kv) return new Response(kv, { headers: { 'Content-Type':'application/json', ...CORS } });
         return json({ error: e.message }, 500);
       }
     }
@@ -1425,15 +1426,18 @@ if (path === '/trains/seattle') {
       if (hit) return hit;
       try {
         const trains = await fetchHelsinkiTrains();
-        const resp = json({ city:'helsinki', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'helsinki', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=15');
         const staleResp = resp.clone();
         staleResp.headers.set('Cache-Control', 'public, max-age=86400');
-        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
+        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp), env.TRAIN_CACHE?.put('trains_helsinki', body, { expirationTtl: 86400 })]));
         return resp;
       } catch (e) {
         const stale = await cache.match(staleKey);
         if (stale) return stale;
+        const kv = env.TRAIN_CACHE ? await env.TRAIN_CACHE.get('trains_helsinki') : null;
+        if (kv) return new Response(kv, { headers: { 'Content-Type':'application/json', ...CORS } });
         return json({ error: e.message }, 500);
       }
     }
@@ -1448,15 +1452,18 @@ if (path === '/trains/seattle') {
       if (hit) return hit;
       try {
         const trains = await fetchSydneyTrains(key);
-        const resp = json({ city:'sydney', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'sydney', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=15');
         const staleResp = resp.clone();
         staleResp.headers.set('Cache-Control', 'public, max-age=86400');
-        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
+        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp), env.TRAIN_CACHE?.put('trains_sydney', body, { expirationTtl: 86400 })]));
         return resp;
       } catch (e) {
         const stale = await cache.match(staleKey);
         if (stale) return stale;
+        const kv = env.TRAIN_CACHE ? await env.TRAIN_CACHE.get('trains_sydney') : null;
+        if (kv) return new Response(kv, { headers: { 'Content-Type':'application/json', ...CORS } });
         return json({ error: e.message }, 500);
       }
     }
@@ -1471,15 +1478,18 @@ if (path === '/trains/seattle') {
       if (hit) return hit;
       try {
         const trains = await fetchTokyoTrains(key);
-        const resp = json({ city:'tokyo', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'tokyo', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=30');
         const staleResp = resp.clone();
         staleResp.headers.set('Cache-Control', 'public, max-age=86400');
-        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
+        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp), env.TRAIN_CACHE?.put('trains_tokyo', body, { expirationTtl: 86400 })]));
         return resp;
       } catch (e) {
         const stale = await cache.match(staleKey);
         if (stale) return stale;
+        const kv = env.TRAIN_CACHE ? await env.TRAIN_CACHE.get('trains_tokyo') : null;
+        if (kv) return new Response(kv, { headers: { 'Content-Type':'application/json', ...CORS } });
         return json({ error: e.message }, 500);
       }
     }

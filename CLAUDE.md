@@ -26,7 +26,17 @@ After updating HANDOFF.md, commit **all changed files** and push to GitHub:
 Do this automatically — do not ask for permission. Every session ends with a push.
 
 ### Worker deploys
-After every `wrangler deploy`, confirm the deployed version ID in the response.
+After every `wrangler deploy`:
+1. Confirm the deployed version ID in the response.
+2. **Always warm the cache** — run this immediately after deploy to populate KV before the first real user request:
+```bash
+BASE="https://transitmap.marcboyer-public.workers.dev"
+for ep in /trains/paris /trains/nyc /trains/helsinki /trains/sydney /trains/tokyo; do
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$ep")
+  echo "$ep → HTTP $STATUS"
+done
+```
+(Cloudflare purges the edge cache on every deploy. KV survives deployments but takes one successful compute to populate after a cold start.)
 
 ### Commit messages
 Always end git commit messages with:

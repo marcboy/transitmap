@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-29 · 14:54 PT
-> **Prototype version:** v4.20 · **Worker version:** w4.9
+> **Last updated:** 2026-05-29 · 15:13 PT
+> **Prototype version:** v4.20 · **Worker version:** w4.10
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev
@@ -74,7 +74,7 @@ PREMIUM_CITIES = ['seattle', 'helsinki', 'sydney', 'japan']
 
 **File:** `cloudflare-worker/index.js`
 **Deploy:** `cd cloudflare-worker && wrangler deploy`
-**Current version:** `w4.9` (constant `WORKER_VERSION` at top of file)
+**Current version:** `w4.10` (constant `WORKER_VERSION` at top of file)
 
 ### Secrets (set via `wrangler secret put SECRET_NAME`)
 | Secret | City | How to get |
@@ -98,12 +98,21 @@ PREMIUM_CITIES = ['seattle', 'helsinki', 'sydney', 'japan']
 }
 ```
 
-### Caching strategy
-- NYC: 30s fresh + 86400s stale fallback (prevents thundering-herd CPU limit failures)
-- Paris: 120s fresh + 86400s stale
-- All others: 15s fresh + 86400s stale
-- Stale cache served on compute failure — 24h TTL ensures cache survives long idle periods (TV off for hours)
-- 503s = Cloudflare CPU limit exceeded; cure is long stale TTL so warm-cache hits dominate
+### Caching strategy — three tiers
+All cities: fresh edge cache → stale edge cache (86400s) → **KV** (86400s, survives deployments)
+
+| City | Fresh TTL | KV key |
+|---|---|---|
+| NYC | 30s | `trains_nyc` |
+| Paris | 120s | `trains_paris` |
+| Helsinki / Sydney / Seattle | 15s | `trains_helsinki` etc. |
+| Tokyo | 30s | `trains_tokyo` |
+
+- **Edge stale** (`caches.default + '__stale'` key): wiped on `wrangler deploy` — only covers intra-session failures
+- **KV** (`TRAIN_CACHE` namespace, id `99f583e82f63440c995eb56463b711c0`): persists across deployments — the permanent fix for post-deploy 503s
+- On every successful compute: writes to edge cache **and** KV (background via `ctx.waitUntil`)
+- On failure: edge stale → KV → 500 error (only if KV also empty, i.e. never computed successfully)
+- **After every `wrangler deploy`: warm the cache** → `for ep in /trains/paris /trains/nyc /trains/helsinki /trains/sydney /trains/tokyo; do curl -s "$BASE$ep" > /dev/null; done`
 
 ---
 
@@ -333,7 +342,7 @@ TZ='America/Los_Angeles' date '+%Y-%m-%d · %H:%M PT'   # → exact LAST_EDIT va
 
 After editing `cloudflare-worker/index.js`:
 
-1. Bump `WORKER_VERSION` constant (e.g. `'w4.9'` → `'w4.10'`)
+1. Bump `WORKER_VERSION` constant (e.g. `'w4.10'` → `'w4.11'`)
 2. Deploy: `cd cloudflare-worker && wrangler deploy`
 3. Note the deployed version ID in HANDOFF.md
 
@@ -357,6 +366,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-29 | w4.10 | Worker: KV three-tier fallback for all cities — edge stale wiped on deploy, KV persists; permanently fixes post-deploy Paris 503s |
 | 2026-05-29 | — | LG webOS: screensaver — canvas.captureStream(1fps)→hidden video; OS sees live video and never idles; opacity:0.01, alternating colour every 1s |
 | 2026-05-29 | — | LG webOS: version stamp 10px→13px (readable on TV); worker version pre-populated at build time (visible immediately, not just after first fetch) |
 | 2026-05-29 | w4.9 | Paris 503 fix: O(n) time-window pre-filter skips past/future journeys before sort; fresh cache 60s→120s; ~10× CPU reduction eliminates CPU-limit kills |
