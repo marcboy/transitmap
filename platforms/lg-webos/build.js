@@ -145,9 +145,11 @@ if (typeof Platform !== 'undefined') {
 })();
 
 // ── LG webOS: prevent screensaver / auto-off ─────────────────────────────────
-// Two-pronged: (1) Luna service disables the system screensaver; (2) synthetic
-// mouse events reset the browser-level idle timer so the remote staying still
-// doesn't blank the screen even if the service call is denied.
+// DOM events (mousemove etc.) do NOT reach the OS-level screensaver — only
+// Luna service calls do. We use two complementary service calls:
+//   1. com.webos.service.tvpower  → changeScreenSaverSettings (disables screensaver)
+//   2. com.webos.service.settings → setSystemSettings screenOffTime:'0' (display timeout off)
+// Both are re-asserted every 30 s, well inside the 2-minute default timeout.
 (function() {
   if (typeof webOS === 'undefined') return;
 
@@ -158,16 +160,16 @@ if (typeof Platform !== 'undefined') {
       onSuccess: function() {},
       onFailure: function() {}
     });
-    // Belt-and-suspenders: synthesise a tiny mouse move to reset idle timer
-    document.dispatchEvent(new MouseEvent('mousemove', {
-      bubbles: true, cancelable: true,
-      clientX: Math.round(Math.random() * 1920),
-      clientY: Math.round(Math.random() * 1080)
-    }));
+    webOS.service.request('luna://com.webos.service.settings', {
+      method: 'setSystemSettings',
+      parameters: { category: 'tv', settings: { screenOffTime: '0' } },
+      onSuccess: function() {},
+      onFailure: function() {}
+    });
   }
 
   keepOn();
-  setInterval(keepOn, 60000); // re-assert every minute
+  setInterval(keepOn, 30000); // every 30 s — well within the 2-min timeout
 })();
 `;
   html = html.replace(/(<\/script>)(\s*<\/body>)/, tvInit + '$1$2');
