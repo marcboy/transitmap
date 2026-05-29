@@ -34,13 +34,17 @@ const TV_CSS = `
   .status-pill { font-size: 14px; padding: 10px 20px; }
   .line-chip { font-size: 14px; padding: 6px 14px 6px 8px; }
   .line-dot  { width: 13px; height: 13px; }
-  /* Hide dev tools that don't belong on TV */
-  #fetch-log        { display: none !important; }
+  /* Hide elements that don't work on TV */
   #departures-panel { display: none !important; }
-  /* Hide the mouse-centric city switcher — TV uses D-pad overlay instead */
-  .city-switcher { display: none !important; }
   /* Theme button is pointless on TV (always dark) */
   .theme-btn { display: none !important; }
+  /* City switcher — keep visible: LG Magic Remote works as a pointer */
+  .city-switcher { top: 60px; }
+  /* Fetch log — keep visible, repositioned into safe zone */
+  #fetch-log { top: 100px; right: 80px; font-size: 12px; max-width: 380px; }
+  #fetch-log .fl-hdr { font-size: 11px; }
+  #fetch-log .fl-stat-name { font-size: 11px; }
+  #fetch-log .fl-stat-nums { font-size: 13px; }
   /* TV city nav overlay */
   #tvNav {
     position: fixed; bottom: 0; left: 0; right: 0;

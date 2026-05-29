@@ -1,6 +1,6 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-29 · 13:35 PT
+> **Last updated:** 2026-05-29 · 14:14 PT
 > **Prototype version:** v4.20 · **Worker version:** w4.7
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
@@ -355,6 +355,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-29 | — | LG webOS: restore city switcher + fetch log (LG Magic Remote is a pointer — mouse UI works); both hidden on Samsung D-pad-only build |
 | 2026-05-29 | — | LG webOS app built: build.js + appinfo.json + ares-package → com.marcboyer.transitmap_1.0.0_all.ipk (34 KB); shares tv-nav.js + platform.js with Samsung |
 | 2026-05-29 | — | Tizen Studio 6.1 + Zulu JDK 8 installed; dev cert + TransitMapDev profile; `tizen package` produces signed `TransitMap.wgt`; PATH configured in `~/.zshrc` |
 | 2026-05-29 | — | Multi-platform structure: `platforms/shared/platform.js` (unified input/IAP API), `platforms/samsung/` (build.js + tv-nav.js + config.xml), stubs for LG / Android TV / Roku / Apple TV |
