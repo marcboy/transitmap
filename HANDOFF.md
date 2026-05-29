@@ -1,294 +1,323 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-29  
-> **Prototype version:** v4.20 (worker w4.7)  
-> **Repo:** https://github.com/marcboy/transitmap  
-> **Live Prototype:** https://marcboy.github.io/transitmap/  
-> **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
+> **Last updated:** 2026-05-29 · 12:11 PT
+> **Prototype version:** v4.20 · **Worker version:** w4.7
+> **Repo:** https://github.com/marcboy/transitmap
+> **Live prototype:** https://marcboy.github.io/transitmap/
+> **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev
 
 ---
 
 ## What This Is
 
-An ambient, art-like live transit map showing real subway train positions across multiple cities. Designed as a beautiful background display for Apple TV, smart TVs, lobbies, and homes.
+An ambient, art-like live transit map showing real-time subway and train positions across multiple world cities. Built as a beautiful background display for Samsung TVs, Apple TV, and other smart TV platforms. Currently exists as a browser prototype + Cloudflare Worker backend, with a Samsung TV (Tizen) app structure ready to package.
 
 ---
 
-## Live Status
-
-| City | Data | Source | Status |
-|---|---|---|---|
-| New York | ✅ Real trains | MTA GTFS-RT (free, no key) | **Live** |
-| Paris | ✅ Real trains | IDFM PRIM SIRI Lite estimated-timetable | **Live** |
-| Seattle | ⏳ Real trains | Sound Transit OBA | **Needs OBA key** |
-| Helsinki | ✅ Real trains | HSL GTFS-RT vehicle positions (free, no key) — Metro M1/M2 + 10 commuter lines + trams | **Live** |
-| Sydney | ✅ Real trains | TfNSW GTFS-RT vehicle positions (prefix route IDs: NSN/ESI/APS/etc.) | **Live** |
-| Tokyo | ✅ Hybrid | Toei lines (A/S/I/E/AR): ODPT live · Tokyo Metro (G/M/H/T/C/Y/Z/N/F): headway timetable sim (same approach as mini-tokyo-3d) | **Live** |
-| Shinkansen | ✅ Timetable-driven | Official JR schedules (all lines) | **Live** |
-
----
-
-## Architecture
-
-```
-MTA GTFS-RT (free, open)
-IDFM PRIM (free key: wrangler secret put IDFM_API_KEY)     ──▶  Cloudflare Worker
-Sound Transit OBA (free key: wrangler secret put OBA_API_KEY)    (transitmap.marcboyer-public.workers.dev)
-                                                                         │
-                                                                         ▼
-                                                              prototype polls /trains/:city
-                                                              every 15 seconds
-                                                                         │
-                                                              ┌──────────┴──────────┐
-                                                              ▼                     ▼
-                                                    HTML Prototype           SwiftUI App
-                                                  (GitHub Pages)         (Apple TV/iPad/iPhone)
-```
-
-**Worker endpoints:**
-- `GET /health` — instant health check, no feed fetching
-- `GET /trains/nyc` — all MTA subway lines, inferred from stop coordinates
-- `GET /trains/paris` — all RATP metro lines, timetable-inferred positions (needs IDFM_API_KEY)
-- `GET /trains/seattle` — Sound Transit Link, real GPS (needs OBA_API_KEY)
-- `GET /paris/debug` — debug: inspects raw SIRI Lite response for metro line 1
-
----
-
-## Repository Structure
+## Repository Layout
 
 ```
 transitmap/
 ├── prototype/
-│   └── transitmap-prototype.html     ← Single-file HTML prototype (v2.1)
+│   └── transitmap-prototype.html     ← Single-file web prototype (source of truth for all platforms)
 ├── cloudflare-worker/
-│   ├── index.js                      ← Worker: all cities, protobuf decoder
-│   └── wrangler.toml                 ← name="transitmap", main="index.js"
-├── ios-app/
-│   └── TransitMap/
-│       ├── TransitMapApp.swift
-│       ├── Config/CityConfig.swift   ← All city/line/feed config
-│       ├── Models/TransitModels.swift
-│       ├── Services/TransitAPIService.swift
-│       ├── Services/TransitViewModel.swift
-│       ├── AdManager/AdManager.swift
-│       └── Views/
-│           ├── TransitMapView.swift
-│           └── CitySelectorView.swift
-└── HANDOFF.md                        ← This file
+│   ├── index.js                      ← Backend: fetches all city feeds, decodes GTFS-RT
+│   └── wrangler.toml                 ← Cloudflare config (name="transitmap")
+├── platforms/
+│   ├── shared/
+│   │   └── platform.js              ← TV input/IAP abstraction layer (Samsung, LG, Android TV)
+│   ├── samsung/
+│   │   ├── config.xml               ← Tizen Web App manifest
+│   │   ├── build.js                 ← Build script: prototype → index.html + TV patches
+│   │   ├── tv-nav.js                ← D-pad remote navigation (city switching)
+│   │   ├── README.md                ← Samsung TV setup guide
+│   │   └── .gitignore               ← Ignores generated index.html and .wgt
+│   ├── lg-webos/
+│   │   ├── appinfo.json             ← webOS manifest stub
+│   │   └── README.md               ← LG TV notes
+│   ├── android-tv/
+│   │   └── README.md               ← Android TV / Vizio notes
+│   ├── roku/
+│   │   └── README.md               ← Roku notes (BrightScript — most different)
+│   └── apple-tv/
+│       └── README.md               ← Apple TV notes (references Swift app)
+├── CLAUDE.md                        ← Rules for Claude (auto-push, HANDOFF updates, etc.)
+└── HANDOFF.md                       ← This file
 ```
 
 ---
 
-## Prototype — How It Works
+## Live City Data
 
-**File:** `prototype/transitmap-prototype.html` (self-contained, open in any browser)
-
-### Key constants at top of JS section:
-```javascript
-const WORKER_URL = 'https://transitmap.marcboyer-public.workers.dev'; // worker URL
-const VERSION    = 'v2.1';
-const LAST_EDIT  = '2026-05-27 04:34 UTC';  // updated on every push
-```
-
-### Data flow:
-1. On load, calls `fetchRealTrains()` immediately
-2. `setInterval` polls again every **15 seconds**
-3. Worker returns `{ city, count, trains: [{id, line, color, lat, lng, status}] }`
-4. Trains with a previous known position **lerp smoothly** to new position over 15s
-5. Cities without a live feed (Tokyo) use **simulated trains** on route paths
-6. On API failure, falls back gracefully — last known positions held
-
-### Version stamp:
-Bottom-right corner shows `v2.1 · built 2026-05-27 04:34 UTC`  
-Top-left shows city name, train count, and **local time in the city's timezone**
-
-### Ad system:
-- Triggers every **5 minutes** automatically
-- Map shrinks to left 50%, ad panel slides in from right
-- Auto-dismisses after 30 seconds, or user clicks Dismiss
-- `closeAd()` calls `resizeCanvas()` + `leafletMap.invalidateSize()` through 700ms transition
-
----
-
-## Cloudflare Worker — How It Works
-
-**File:** `cloudflare-worker/index.js` (516 lines, self-contained, no npm dependencies)
-
-### NYC (MTA):
-- Fetches all **8 GTFS-RT feeds** concurrently (1/2/3, A/C/E, B/D/F/M, G, J/Z, N/Q/R/W, L, S)
-- Feeds are **trip update format** — no GPS coordinates
-- Position inferred from **next stop ID** → lookup in `STOPS` table (built-in, ~100 stations)
-- Field numbers discovered via debug: `entity.id` = plain string, `routeId` = field 5, `stopId` = field 4
-- Returns ~300-400 trains when MTA system is running
-
-### Paris (IDFM):
-- Feed: `https://prim.iledefrance-mobilites.fr/marketplace/estimated-timetable?LineRef=ALL`
-- Auth header: `apikey: YOUR_KEY`
-- PRIM does **not** publish a GTFS-RT vehicle positions feed — uses SIRI Lite estimated timetable
-- Each `EstimatedVehicleJourney` has one `EstimatedCall` with the next stop's `StopPointRef`
-- `StopPointRef` format: `STIF:StopPoint:Q:XXXXX:` — worker extracts Q-number, looks up coords from `PARIS_STOPS_BY_ID` (805 stops from IDFM `arrets-lignes` dataset)
-- Line IDs: `STIF:Line::C01371:`–`C01384:` = M1–M14; M3b=`C01386`, M7b=`C01387`
-- Returns ~800–900 trains when Paris Metro is running
-
-### Seattle (Sound Transit OBA):
-- Feed: `https://api.pugetsound.onebusaway.org/api/gtfs_realtime/vehicle-positions-for-agency/40.pb?key=KEY`
-- **Vehicle positions feed** — real GPS coordinates
-- Filters to `1-Line` (red) and `2-Line` (blue) only
-- **Status: needs OBA API key**
-
-### Protobuf decoder:
-- Custom inline `PB` class — no dependencies
-- Handles wire types 0 (varint), 2 (length-delimited), 5 (32-bit float)
-- Decodes: `FeedMessage → FeedEntity → TripUpdate/VehiclePosition → StopTimeUpdate/Position`
-
----
-
-## Secrets Required
-
-Set via `wrangler secret put SECRET_NAME`:
-
-| Secret | Used for | How to get |
-|---|---|---|
-| `IDFM_API_KEY` | Paris RATP metro | https://prim.iledefrance-mobilites.fr → account → API key |
-| `OBA_API_KEY` | Seattle Sound Transit | Email open_transit_data@soundtransit.org |
-
-Current key values are set — run `wrangler secret list` to verify.
-
----
-
-## Deploy / Update Workflow
-
-```bash
-# 1. Make changes to cloudflare-worker/index.js
-cd ~/transitmap/cloudflare-worker
-git pull
-
-# 2. Deploy worker
-wrangler deploy
-
-# 3. Prototype auto-deploys via GitHub Pages on push
-# Just push prototype/transitmap-prototype.html and GitHub does the rest
-
-# Set/update a secret
-wrangler secret put IDFM_API_KEY
-wrangler secret put OBA_API_KEY
-```
-
----
-
-## NYC Route Accuracy
-
-Routes are built from **official MTA GTFS stop coordinates** — same data the real-time feed references. Each line's path is the ordered sequence of real station lat/lng values from the STOPS table. This ensures train dots always fall on their line.
-
-Lines covered: 1, 2, 3, 4, 5, 6, 7, A (×2 branches: Far Rockaway + Lefferts/Howard Beach), C, E, B, D, F, M, G, J, Z, L, N, Q (×2), R, W, S
-
----
-
-## Paris — How It Works
-
-PRIM does not publish a GTFS-RT vehicle positions feed. The correct endpoint is the **SIRI Lite estimated timetable**, which returns one `EstimatedCall` per active vehicle journey (the next stop). The worker extracts the `StopPointRef` Q-number and looks up coordinates from an embedded 805-stop table built from the IDFM `arrets-lignes` open data dataset.
-
-> ⚠️ Rotate the IDFM API key — it was visible in earlier chat history.
-
----
-
-## Resuming This Work
-
-### Where things stand (2026-05-28 end of session)
-
-**Prototype:** v4.2 — Paris, NYC, Seattle polling live; Shinkansen timetable-driven; Tokyo simulated.  
-**Worker:** w3.8 — deployed `e1e74bbc`. All three live cities cache correctly. Paris no longer 503s.
-
-**What's working well:**
-- NYC: ~300–400 trains, protobuf decoded, cached 15s, fast (60ms warm)
-- Paris: ~800 trains, clock-driven animation using timetable segments (`seg` object), cached 60s fresh + 300s stale fallback — no more 503s under load
-- Shinkansen: 9 service types, clock-driven from JR schedule data, no API needed
-- On-screen fetch log panel (top-right) with per-city success/fail counters
-
-**Immediate next things to do (in priority order):**
-
-1. **Rotate the IDFM API key** — it was visible in earlier chat history. Go to https://prim.iledefrance-mobilites.fr → account → regenerate → `wrangler secret put IDFM_API_KEY`
-
-2. **Seattle live data** — just needs an OBA key. Email open_transit_data@soundtransit.org, then `wrangler secret put OBA_API_KEY`. Worker endpoint is already implemented at `/trains/seattle`.
-
-3. **Paris route accuracy** — trains animate correctly but positions don't snap to the metro lines because the route-constrained animation (`projectOnRouteT`) is only active for NYC/Seattle. Paris uses straight-line interpolation between stop coordinates. To fix: extend `stepTrains` clock-driven branch to also project onto the nearest Paris route polyline.
-
-4. **Paris line paths** — a Python generator script exists at `prototype/paris_routes_gen.py`. Run it and paste the output into the prototype to replace the hand-drawn route polylines with accurate IDFM coordinates.
-
-5. **More trains visible in Paris** — currently 42% of journeys get a `seg` (usable timetable segment), up from 11%. The remaining 58% either have only 1 call in PRIM (can't interpolate — need 2 stops to form a segment) or their stop Q-IDs aren't in our 805-stop lookup table. To investigate: hit `/paris/debug` and look for stop IDs that return null from `lookupParisStopById`.
-
-6. **Tokyo live data** — ODPT API, free key at https://developer.odpt.org. Add `/trains/tokyo` worker endpoint.
-
-### Key technical context for next session
-
-**Paris animation — how it works:**
-Worker parses SIRI Lite `EstimatedCalls` per journey, finds the segment where `now` falls between `tDep` (stop A departure) and `tArr` (stop B arrival), returns `seg: {aLat,aLng,tDep,bLat,bLng,tArr}`. Client computes `t = (Date.now()-tDep)/(tArr-tDep)` and lerps. Works correctly even on stale cached responses because all timestamps are absolute UTC ms.
-
-**Paris 503 fix (w3.8) — what we did:**
-- `_tsCache` Map memoizes `new Date(s).getTime()` — reduced from ~24,000 allocations to near-zero per compute
-- Two-tier cache: 60s `cacheKey` + 300s `staleKey`; on failure the stale response is served
-- Fallback segment search is now O(1) (only checks calls[0]→calls[1])
-
-**Worker version history shortcuts:**
-- NYC was broken by CPU limit → fixed in w3.5 (Cache API + TextDecoder reuse)
-- Paris was broken by CPU limit → fixed in w3.8 (timestamp memo + stale fallback)
-- Both patterns: free-tier Workers has 10ms CPU limit; fix = cache aggressively and memoize expensive operations
-
----
-
-## Platform Build Plan
-
-| Track | Platforms | Stack | Status |
+| City | Trains | Source | Worker endpoint |
 |---|---|---|---|
-| 1 | Apple TV, iPad, iPhone | SwiftUI + MapKit + AdMob | ✅ Code written, not in Xcode |
-| 2 | Samsung TV, LG TV | React + Tizen / webOS + GAM | 🔲 Not started |
-| 3 | Android TV, Fire TV | Kotlin + Compose + AdMob | 🔲 Not started |
-| 4 | Roku | BrightScript + RAF | 🔲 Lowest priority |
+| New York | ~350 live | MTA GTFS-RT (free, no key) | `/trains/nyc` |
+| Paris | ~800 live | IDFM PRIM SIRI Lite (needs `IDFM_API_KEY`) | `/trains/paris` |
+| Tokyo (Toei) | ~40 live | ODPT JSON API (needs `ODPT_API_KEY`) | `/trains/tokyo` |
+| Tokyo Metro | ~200 sim | JST clock-driven headway simulation | merged in prototype |
+| Helsinki | ~120 live | HSL GTFS-RT (free, no key) | `/trains/helsinki` |
+| Sydney | ~130 live | TfNSW GTFS-RT (free, no key) | `/trains/sydney` |
+| Seattle | live | Sound Transit OBA (needs `OBA_API_KEY`) | `/trains/seattle` |
+| Shinkansen | timetable | JR schedule data (no API) | computed in prototype |
+
+### City tiers (IAP)
+```
+FREE_CITIES    = ['nyc', 'paris', 'tokyo']
+PREMIUM_CITIES = ['seattle', 'helsinki', 'sydney', 'japan']
+```
+- `unlockPremium()` is the single IAP callback point (called by Swift or Platform.purchase())
+- Premium state persisted in `localStorage('transitmap_premium')`
 
 ---
 
-## iOS/tvOS App Setup (when ready)
+## Cloudflare Worker
+
+**File:** `cloudflare-worker/index.js`
+**Deploy:** `cd cloudflare-worker && wrangler deploy`
+**Current version:** `w4.7` (constant `WORKER_VERSION` at top of file)
+
+### Secrets (set via `wrangler secret put SECRET_NAME`)
+| Secret | City | How to get |
+|---|---|---|
+| `IDFM_API_KEY` | Paris | https://prim.iledefrance-mobilites.fr → account → API key |
+| `ODPT_API_KEY` | Tokyo (Toei) | https://developer.odpt.org → free key |
+| `OBA_API_KEY` | Seattle | Email open_transit_data@soundtransit.org |
+
+> ⚠️ **Rotate the IDFM API key** — it was exposed in earlier chat history.
+
+### Worker response format
+```json
+{
+  "city": "nyc",
+  "count": 347,
+  "workerVersion": "w4.7",
+  "updatedAt": "2026-05-29T18:00:00Z",
+  "trains": [
+    { "id": "trip123", "line": "A", "color": "#1657A8", "lat": 40.753, "lng": -73.987, "status": "MOVE" }
+  ]
+}
+```
+
+### Caching strategy
+- NYC: 30s fresh + 300s stale fallback (prevents thundering-herd CPU limit failures)
+- All others: 15s fresh + 300s stale
+- Stale cache served on upstream failure — no 503s
+
+---
+
+## Prototype
+
+**File:** `prototype/transitmap-prototype.html`
+**View live:** https://marcboy.github.io/transitmap/
+**This is the source of truth for all TV platforms.**
+
+### Key constants (top of `<script>`)
+```javascript
+const WORKER_URL = 'https://transitmap.marcboyer-public.workers.dev';
+const VERSION    = 'v4.20';
+const LAST_EDIT  = '2026-05-28 · 20:43 PT';
+```
+
+### How trains move
+1. `fetchRealTrains()` called on load and every **15 seconds**
+2. Each train's GPS position is **projected onto its route polyline** (`projectOnRouteT`)
+3. Between fetches, trains advance along the line at the measured speed (`routeT += routeSpeed * dt`)
+4. Paris trains use **clock-driven timetable segments** (`seg` object) — interpolate between stop A → stop B using wall clock
+5. Tokyo Metro uses **headway simulation** — JST time drives position on each line's path
+6. Shinkansen uses **JR schedule timetable** — computed entirely in the prototype
+
+### Light/dark map toggle
+- Button: `☀` / `🌑` in top-right
+- Dark: CartoDB `dark_all`
+- Light: CartoDB `rastertiles/voyager` (grey city, clear blue water)
+- `drawRoutes()` and `drawTrains()` both check `mapTheme === 'light'` and adjust opacity/glow
+
+### How to update a city's routes
+Routes are stored in `CITIES[id].routes` as arrays of `[lat, lng]` pairs:
+```javascript
+{ id:'T1', color:'#F9E200', path:[ [-33.867,151.207], [-33.839,151.206], ... ]}
+```
+Trains with a matching `line` ID snap to the closest point on the route path. If no route matches, the train renders at its GPS coordinates with no track line underneath.
+
+---
+
+## Samsung TV App
+
+### Architecture
+The Samsung app is a **Tizen Web App** — same HTML/JS/CSS as the prototype, packaged as a `.wgt` file.
+
+`platforms/samsung/build.js` reads the prototype and applies TV patches:
+- Inlines `platform.js` (input/IAP abstraction)
+- Inlines `tv-nav.js` (D-pad city navigation overlay)
+- Adds TV safe-zone CSS (80px insets, larger fonts, `cursor: none`)
+- Hides dev tools (fetch log, theme toggle)
+- Replaces the click-based city switcher with a D-pad overlay
+
+**The prototype is the single source of truth.** When prototype data or logic changes, re-run `node build.js` to update the TV app.
+
+### Remote control navigation
+A city nav bar appears at the bottom when the user presses left/right:
+- **◀ / ▶** — browse cities
+- **OK / Enter** — select highlighted city
+- **Back** — dismiss overlay (second Back exits app)
+- Overlay auto-hides after 5 seconds of inactivity
+
+### Platform abstraction (`platforms/shared/platform.js`)
+```javascript
+Platform.type          // 'tizen' | 'webos' | 'firetv' | 'web'
+Platform.init()        // registers keys, hides cursor
+Platform.onRemoteKey(handler)  // unified D-pad events
+Platform.purchase(id, ok, fail) // IAP bridge (stub — wire per platform)
+Platform.exit()        // platform-specific app exit
+```
+
+---
+
+## Development Environment (Mac — Apple Silicon)
+
+### What's installed
+| Tool | Location | Version |
+|---|---|---|
+| Tizen Studio CLI | `~/tizen-studio/` | 6.1 |
+| Tizen `tizen` CLI | `~/tizen-studio/tools/ide/bin/tizen` | 2.5.25 |
+| Java 8 (Zulu ARM64) | `~/jdk-zulu8/` | 1.8.0_492 |
+| Java 17 (Homebrew) | `/opt/homebrew/opt/openjdk@17/` | 17.0.19 |
+| Samsung TV resources | `~/tizen-studio/` | 10.0.0 |
+| Developer certificate | `~/tizen-studio-data/keystore/author/transitmap-author.p12` | self-signed |
+| Security profile | `~/tizen-studio-data/profile/profiles.xml` | `TransitMapDev` |
+
+> **Note on Java:** Tizen's package manager requires Java 8 (JAXB removed in Java 9+). The SDK uses the Zulu JDK 8 at `~/jdk-zulu8/`. This is configured in `~/tizen-studio/sdk.info`:
+> ```
+> JDK_PATH=/Users/marcboyer/jdk-zulu8
+> ```
+
+> **Note on emulator:** The Tizen TV emulator is Intel-only and won't run on Apple Silicon. Test on a real Samsung TV instead.
+
+### Shell PATH (added to `~/.zshrc`)
+```bash
+export TIZEN_STUDIO="$HOME/tizen-studio"
+export JAVA_HOME="$HOME/jdk-zulu8/Contents/Home"
+export PATH="$TIZEN_STUDIO/tools/ide/bin:$TIZEN_STUDIO/tools:$JAVA_HOME/bin:$PATH"
+```
+Open a new terminal after setup for these to take effect.
+
+---
+
+## Build & Deploy — Samsung TV
+
+### Full workflow (run from repo root)
 
 ```bash
-# 1. Install tools
-brew install protobuf swift-protobuf
+# 1. Build the TV app from the prototype
+cd platforms/samsung
+node build.js
+# → generates platforms/samsung/index.html (TV-adapted, self-contained)
 
-# 2. Generate protobuf types
-curl -O https://raw.githubusercontent.com/google/transit/master/gtfs-realtime/proto/gtfs-realtime.proto
-protoc --swift_out=. gtfs-realtime.proto
-# → adds GtfsRealtime.pb.swift to project
+# 2. Package as a signed .wgt file
+tizen package --type wgt --sign TransitMapDev -- .
+# → generates platforms/samsung/TransitMap.wgt (signed, ready to install)
 
-# 3. Xcode: new SwiftUI project, add tvOS target
-# 4. Add Swift packages:
-#    https://github.com/apple/swift-protobuf
-#    https://github.com/googleads/swift-package-manager-google-mobile-ads
-# 5. Copy all Swift files from ios-app/TransitMap/ into Xcode project
-# 6. Add AdMob App IDs to Info.plist (GADApplicationIdentifier)
-# 7. Replace test Ad Unit IDs in AdManager.swift
+# 3a. Sideload onto a Samsung TV (Developer Mode required)
+#     On the TV: Settings → Support → Developer Mode → enter your Mac's IP
+tizen install --target <TV-IP-ADDRESS> -- TransitMap.wgt
+
+# 3b. Watch mode — auto-rebuilds when prototype changes
+node build.js --watch
 ```
+
+### To publish to Samsung Seller Office
+1. Replace `0000000000` in `platforms/samsung/config.xml` with your actual package ID from https://seller.samsungapps.com
+2. Create a distribution certificate (Samsung partner account required) — replaces the current self-signed dev cert
+3. Re-run `tizen package` with the distribution profile
+4. Upload `.wgt` to Samsung Sellers Office
+
+---
+
+## Other TV Platforms (future)
+
+| Platform | Approach | Effort | Key difference |
+|---|---|---|---|
+| LG webOS | Same as Samsung — web app, `appinfo.json` manifest | Low | `ares-package` instead of Tizen CLI; `webOS` global for platform detection |
+| Android TV / Vizio | Android app with WebView loading `index.html` | Medium | IAP via Google Play Billing; Java bridge to call `unlockPremium()` |
+| Roku | Full BrightScript rewrite — no HTML5 support | High | Uses same Cloudflare Worker API; different rendering engine entirely |
+| Apple TV | Native tvOS SwiftUI app (already in progress) | — | IAP via StoreKit; Swift bridge calls `unlockPremium()` |
+
+See `platforms/*/README.md` for detailed notes on each.
 
 ---
 
 ## Adding a New City
 
-1. Add city config to `prototype/transitmap-prototype.html` CITIES object:
-   ```javascript
-   london: {
-     name: 'London', center: [51.509, -0.118], zoom: 12,
-     timezone: 'Europe/London',
-     lines: [{id:'Central', name:'Central', color:'#E32017'}, ...],
-     routes: [{id:'Central', color:'#E32017', path:[[51.52,-0.05],...]}],
-   }
-   ```
-2. Add worker endpoint `/trains/london` in `index.js`
-3. Add city button in prototype HTML
-4. Add to `fetchRealTrains()` city condition
+### 1. Prototype (`prototype/transitmap-prototype.html`)
+Add to the `CITIES` object:
+```javascript
+london: {
+  name: 'London',
+  center: [51.509, -0.118],
+  zoom: 12,
+  timezone: 'Europe/London',
+  lines: [
+    { id:'Central', name:'Central', color:'#E32017' },
+    // ...
+  ],
+  routes: [
+    { id:'Central', color:'#E32017', path:[[51.515,-0.072],[51.513,-0.085],...] },
+    // ...
+  ],
+},
+```
+Add to `ALL_CITIES_LIST` and either `FREE_CITIES` or `PREMIUM_CITIES`.
 
-Cities ready to add (all have GTFS-RT feeds):
+### 2. Worker (`cloudflare-worker/index.js`)
+Add a `/trains/london` handler. Cities with free GTFS-RT feeds ready to add:
 - **London** — TfL Unified API (free key at https://api.tfl.gov.uk)
 - **Chicago** — CTA GTFS-RT (free, no key)
 - **San Francisco** — 511 SF Bay (free key at https://511.org/open-data/token)
-- **Tokyo** — ODPT (free key at https://developer.odpt.org)
+- **Berlin** — VBB GTFS-RT (free)
+
+### 3. Rebuild TV app
+```bash
+cd platforms/samsung && node build.js
+```
+City data is picked up automatically — no TV-specific changes needed.
+
+---
+
+## Updating the Prototype
+
+After editing `prototype/transitmap-prototype.html`:
+
+1. Bump `VERSION` and `LAST_EDIT` at the bottom of the `<script>` block
+2. Update `?v=X.X` in both lines of `index.html` (cache-busting)
+3. Update HANDOFF.md change log
+4. Rebuild TV app: `cd platforms/samsung && node build.js`
+5. Commit and push
+
+```bash
+TZ='America/Los_Angeles' date '+%Y-%m-%d · %H:%M PT'   # → exact LAST_EDIT value
+```
+
+## Updating the Worker
+
+After editing `cloudflare-worker/index.js`:
+
+1. Bump `WORKER_VERSION` constant (e.g. `'w4.7'` → `'w4.8'`)
+2. Deploy: `cd cloudflare-worker && wrangler deploy`
+3. Note the deployed version ID in HANDOFF.md
+
+---
+
+## Secrets Management
+
+```bash
+# List currently set secrets
+cd cloudflare-worker && wrangler secret list
+
+# Set or rotate a secret
+wrangler secret put IDFM_API_KEY
+wrangler secret put ODPT_API_KEY
+wrangler secret put OBA_API_KEY
+```
 
 ---
 
@@ -296,64 +325,35 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
-| 2026-05-29 | —     | Tizen Studio 6.1 installed (~/tizen-studio); Java 8 Zulu at ~/jdk-zulu8; dev cert + TransitMapDev profile created; tizen package produces signed TransitMap.wgt; PATH added to ~/.zshrc |
-| 2026-05-29 | —     | Multi-platform TV structure: platforms/shared/platform.js (input+IAP abstraction), platforms/samsung/ (Tizen Web App — build.js + tv-nav.js + config.xml), stubs for LG webOS / Android TV / Roku / Apple TV |
-| 2026-05-28 | v4.20 | Sydney: add T3 (Bankstown), T5 (Cumberland loop), T9 (Northern to Hornsby); extend T1 North Shore to Berowra, T1 Western to Penrith, T2 to Leppington, T4 Illawarra to Waterfall + Cronulla branch, T8 to Campbelltown |
-| 2026-05-28 | v4.19 | City tier system: FREE_CITIES (NYC/Paris/Tokyo) + PREMIUM_CITIES (Seattle/Helsinki/Sydney/Shinkansen); unlockPremium() is Swift IAP callback; locked cities show 🔒 in dropdown; unlock modal |
-| 2026-05-28 | v4.18 | Light mode polish: switch tile to CartoDB Voyager (clear blue water); reduce train glow radius+opacity; softer route lines; dark rim on dots in light mode |
-| 2026-05-28 | v4.17 | Light/dark map toggle — ☀/🌑 button in topbar; CartoDB Voyager (grey city, blue water) vs dark_all; tint + fade-cover color switch on toggle |
-| 2026-05-28 | v4.16 | Helsinki: add routes for 7 missing commuter lines (I/L/P/T/X/Y/Z share tracks with K/R/U); replace 4 crude tram segments with 5 accurate inner-city corridors; worker w4.7 maps all trams to 'tram' |
-| 2026-05-28 | v4.15 | Tokyo Metro: 9 lines now use JST clock-driven headway simulation (same as mini-tokyo-3d); Toei keeps real ODPT data; merged in render loop |
-| 2026-05-28 | v4.14 | City switcher: dropdown "More ▾" + dynamic last-3 quick buttons; pickCity() tracks recents |
-| 2026-05-28 | v4.13 | Tokyo: fix ODPT URL (v4 not 4), single-fetch all operators, handle null toStation, add Arakawa tram — worker w4.6; note: key covers Toei only (no TokyoMetro) |
-| 2026-05-28 | v4.12 | Tokyo: switch from simulated to real ODPT data (ODPT JSON API, station midpoint positioning) — worker w4.5 |
-| 2026-05-28 | v4.11 | Helsinki Metro: M2 now red (#E4003A) to distinguish from M1 orange — worker w4.4 |
-| 2026-05-28 | v4.10 | Helsinki: add trams (1–15, green) + commuter rail (I/K/L/P/R/T/U/X/Y/Z) with individual colors + route paths — worker w4.3 |
-| 2026-05-28 | v4.9 | Fix Sydney route ID matching — TfNSW uses prefix format (NSN_, ESI_, APS_, etc.) not T1/T4; added T3/T5/T9 to legend; 134 trains live |
-| 2026-05-28 | v4.8 | Add Helsinki (HSL Metro M1/M2, free GTFS-RT) and Sydney (TfNSW T1/T2/T4/T8/Metro M1) — prototype routes + city buttons + worker w4.2 fetch functions |
-| 2026-05-28 | v4.7 | Remove ad system — all ad CSS, HTML panel, and JS scheduling removed; fade-cover retained for city-switch transition |
-| 2026-05-28 | v4.6 | Fix version stamp format consistency: both lines now use YYYY-MM-DD · HH:MM PT (toPT() was producing MM/DD/YYYY format via toLocaleString) |
-| 2026-05-28 | v4.5 | Version stamp: added second line showing worker version + data timestamp in PT (e.g. "w4.1 · data 05/28/2026 · 15:44 PT"). Worker now returns workerVersion field in all city responses; WORKER_VERSION constant added to worker. Prototype uses toPT() helper (Intl.DateTimeFormat with America/Los_Angeles) to convert updatedAt UTC → PT |
-| 2026-05-28 | v4.4 | Paris animation rework — snap-to-route: instead of projecting both segment endpoints to route T values (caused jumps on symmetric/curved lines), now interpolates position in lat/lng space between the two stop coordinates, then snaps the interpolated point to the nearest point on the route polyline each frame. Simpler, more robust, eliminates wrong-direction and wrong-section artifacts. Added snapToRoute() helper; removed segTA/segTB |
-| 2026-05-28 | w4.1 | Paris: prevent trains skipping multiple stations — PRIM omits intermediate stops so adjacent time-sorted pairs can span 3-4 physical stations. Added distance cap: pairs more than 0.013° apart (~1.44km N-S, ~0.96km E-W at 48.8°N) are rejected. Paris Metro max legitimate inter-station ≈ 950m (La Défense→Esplanade). Both active-segment and fallback loops now use validPair() check. Deployed d3af5ffd |
-| 2026-05-28 | v4.3 | Paris route-constrained animation: trains now move along their metro line polyline instead of flying in a straight line between stop coordinates. At fetch time, both segment endpoints (aLat/aLng and bLat/bLng) are projected onto the route polyline via projectOnRouteT → stored as segTA/segTB. stepTrains interpolates routeAtT(path, segTA + t*(segTB-segTA)) each frame. Straight-line fallback kept for trains with no route path |
-| 2026-05-28 | w4.0 | Fix NYC self-reinforcing 503 loop: same thundering-herd pattern as Paris — compute fails CPU limit → cache.put never runs → cache never refreshes → every request is a miss → loop. Fix: two-tier cache (30s fresh + 300s stale fallback); on compute failure serve stale instead of 503. Cache TTL 15s→30s. Deployed d8c63575 |
-| 2026-05-28 | w3.9 | Fix Paris trains not moving: PRIM returns EstimatedCalls in stop-sequence order (not time order) — bidirectional/loop lines produce pairs like 22:32→22:30→22:34→22:28 so every tArr>tDep check failed. Fix: sort calls by departure time before processing, take 10 calls instead of 5, restore full fallback loop. Result: 14→63 actively moving trains, 11%→42% with valid seg. M14 (automated) at 95%. Deployed 34952ab4 |
-| 2026-05-28 | w3.8 | Fix Paris intermittent 503 (thundering herd + CPU limit): (1) module-level timestamp memoization (_tsCache Map) cuts ~24,000 new Date() calls per compute to near-zero; (2) two-tier cache — 60s fresh key + 300s stale-fallback key; PRIM failure now serves last good response instead of 503; (3) fallback loop shortened from O(n) to O(1) by only checking calls[0]→calls[1]. 10/10 parallel requests return 200. Deployed e1e74bbc |
-| 2026-05-28 | v4.2 | Paris clock-driven animation: worker now returns timetable segment endpoints (aLat/aLng/tDep → bLat/bLng/tArr); client uses Date.now() to interpolate continuously — no velocity, no ID matching. Worker also returns upcoming segments (train departing soon) so 25% of trains have a segment vs 6% before. Cap at 180s filters PRIM multi-station gaps. Median segment 97s = correct Metro speed |
-| 2026-05-28 | w3.7 | Paris interpolation: worker returns seg {aLat,aLng,tDep,bLat,bLng,tArr} per train; fallback builds upcoming call[0]→call[1] segment so trains animate automatically when departure time passes; cap 180s filters multi-station PRIM gaps; calls slice 3→5 |
-| 2026-05-28 | v4.1 | Fetch stats panel: per-city success/fail counters (✓/✗ + %) displayed in fetch-log panel; resets at midnight (daily); skips don't count as attempts |
-| 2026-05-28 | v4.0 | Route-constrained animation: trains advance along their route polyline instead of dead-reckoning in lat/lng space. projectOnRouteT() snaps each reported position onto the track; routeSpeed (ΔrouteT/ms from last 2 fetches) drives per-frame motion. Trains never drift off their line. Direction is natural from sign of speed. No route path = stays at reported position |
-| 2026-05-28 | v3.9 | Dead-reckoning animation: replaced 15s lerp (froze when complete) with velocity extrapolation — measure speed from last 2 fetches, continue at that rate until next fetch corrects position. Trains now move continuously. First fetch has v=0; velocity resets on each new fetch pair. Cap at 120s to prevent runaway drift |
-| 2026-05-28 | v3.8 | Fix status pill showing stale data from previous city: switchCity() now immediately sets correct label per city type ("Connecting…" for live cities, "Simulated · Tokyo Metro" for Tokyo, kept Timetable for Shinkansen), and triggers an immediate fetch instead of waiting up to 15s |
-| 2026-05-28 | w3.6 | Fix Paris intermittent 503: add Cache API on /trains/paris response (20s TTL) — same CPU-limit issue as NYC w3.5. Cold: ~2.5s, warm: ~60ms. No more 503s under rapid-fire load |
-| 2026-05-28 | w3.5 | Fix NYC worker error 1102 (CPU limit): cache final decoded JSON via Cache API (15s TTL) so protobuf decode runs once per datacenter not per poll; reuse single TextDecoder; str() now zero-copy (subarray not slice); MTA feed cache TTL 10s→30s. Result: 363ms cold → 59ms warm |
-| 2026-05-28 | v3.7 | Fix fetching broken by AbortSignal.timeout() browser incompatibility: replaced with AbortController+setTimeout; added on-screen fetch log panel (top-right) showing timestamp, city, result, and duration for last 8 attempts |
-| 2026-05-28 | v3.6 | Fix frequent fetch failures: add _fetchInFlight guard (prevents overlapping polls), AbortSignal.timeout(12s) on prototype fetch, PRIM cache TTL 15s→30s, cap interpolation to first 3 calls per journey |
-| 2026-05-28 | w3.3 | Paris worker: interpolate train position between stops using ExpectedArrivalTime/ExpectedDepartureTime from SIRI EstimatedCalls — trains no longer snap to fixed stop points but move smoothly between stations based on real timetable timing |
-| 2026-05-28 | v3.5 | Tokyo map rebuilt from OpenStreetMap station coordinates — all 13 lines (9 Tokyo Metro + 4 Toei) redrawn with real station lat/lng; Oedo loop path corrected; zoom adjusted to 12 to show full network |
-| 2026-05-28 | v3.4 | South Bellevue departure board: now fetches live OBA real-time data (stop 40_E09-T2, /departures/south-bellevue worker endpoint); shows "Live · Sound Transit" badge when predicted times available; falls back to schedule if OBA key unavailable |
-| 2026-05-28 | v3.3 | Seattle pane: departure board (bottom-left) showing next 4 trains from South Bellevue → Westlake on 2 Line; clock-driven from Sound Transit schedule (12-min peak / 24-min off-peak); updates every minute; hidden on other city panes |
-| 2026-05-28 | v3.2 | Fix M11 and M14 route paths: M11 adds Jourdain + 3 eastern extension stations (Montreuil-Hôpital, La Dhuys, Rosny-Bois-Perrier); M14 adds 4 southern extension stations (Villejuif-Gustave Roussy, Hôpital Bicêtre, Maison Blanche, Olympiades) bridging the gap to L'Haÿ-les-Roses |
-| 2026-05-28 | v3.1 | Paris live data working: switched from non-existent GTFS-RT feed to PRIM SIRI Lite estimated-timetable; 805-stop ID lookup table; correct STIF line IDs; ~850 trains live |
-| 2026-05-28 | v3.0 | Paris Metro routes rebuilt from official IDFM station coordinates — all 16 lines accurate (M1–M14, M3b, M7b), replacing hand-crafted approximations off by up to ~800m |
-| 2026-05-27 | v2.9 | Fix: LAST_EDIT timestamp was showing 17:30 PT (future); corrected to 11:20 PT |
-| 2026-05-27 | v2.8 | Shinkansen timetable engine: 9 service types, clock-driven positions, no API key needed |
-| 2026-05-27 | v2.7 | Fix GitHub Pages stale cache: no-cache meta tags + ?v= query string in index.html redirect |
-| 2026-05-27 | v2.6 | Version stamp now shows time in Pacific Time (e.g. "v2.6 · built 2026-05-27 · 16:45 PT") |
-| 2026-05-27 | v2.5 | Project rule: HANDOFF.md must be updated on every code change; added CLAUDE.md |
-| 2026-05-27 | v2.4 | Fix: trains flying across map — distance guard (>0.05° = teleport not lerp); worker uses tripId as stable key |
-| 2026-05-27 | v2.3 | Fix: async race condition — NYC fetch result no longer overwrites status/trains on other cities |
-| 2026-05-27 | v2.2 | Japan Shinkansen city: 6 lines (Tokaido-Sanyo, Tohoku, Joetsu, Hokuriku, Kyushu, Nishi-Kyushu) |
-| 2026-05-27 | v2.1 | Paris live data endpoint added (URL debugging in progress) |
-| 2026-05-27 | v2.0 | Smooth lerp animation — real trains glide between 15s API updates |
-| 2026-05-27 | v1.9 | NYC routes rebuilt from real GTFS stop coordinates — all 24 lines accurate |
-| 2026-05-27 | v1.8 | Always update trains on fetch; show last-updated HH:MM:SS in status pill |
-| 2026-05-27 | v1.7 | Fix closeAd — canvas resize + invalidateSize through full CSS transition |
-| 2026-05-27 | v1.6 | Seattle live data polling via Sound Transit OBA (pending key) |
-| 2026-05-27 | v1.5 | A/C/E distinct blue shades; city-local timezone in top-left clock |
-| 2026-05-27 | v1.4 | NYC route paths redrawn from real stop coords (A train branches fixed) |
-| 2026-05-27 | v1.3 | Removed bottom-right clock; version stamp = build time only |
-| 2026-05-27 | v1.2 | Local city date/time added top-left; muted text brightened |
-| 2026-05-27 | v1.1 | Real MTA train data live; worker deployed; 15s polling; position lerp |
-| 2026-05-26 | v1.0 | Initial prototype: Leaflet maps, simulated trains, split-screen ads |
+| 2026-05-29 | — | Tizen Studio 6.1 + Zulu JDK 8 installed; dev cert + TransitMapDev profile; `tizen package` produces signed `TransitMap.wgt`; PATH configured in `~/.zshrc` |
+| 2026-05-29 | — | Multi-platform structure: `platforms/shared/platform.js` (unified input/IAP API), `platforms/samsung/` (build.js + tv-nav.js + config.xml), stubs for LG / Android TV / Roku / Apple TV |
+| 2026-05-28 | v4.20 | Sydney: add T3 (Bankstown), T5 (Cumberland), T9 (Northern); extend T1 to Berowra/Penrith, T2 to Leppington, T4 to Waterfall + Cronulla branch, T8 to Campbelltown |
+| 2026-05-28 | v4.19 | City tier system: FREE_CITIES + PREMIUM_CITIES; `unlockPremium()` IAP callback; locked cities show 🔒; unlock modal |
+| 2026-05-28 | v4.18 | Light mode: CartoDB Voyager tile (blue water); softer train glow + route opacity in light mode |
+| 2026-05-28 | v4.17 | Light/dark map toggle — ☀/🌑 button; CartoDB Voyager vs dark_all |
+| 2026-05-28 | v4.16 | Helsinki: 7 missing commuter lines (I/L/P/T/X/Y/Z); worker w4.7 maps all trams to `tram` |
+| 2026-05-28 | v4.15 | Tokyo Metro: 9 lines JST headway simulation (same as mini-tokyo-3d); Toei keeps real ODPT data |
+| 2026-05-28 | v4.14 | City switcher: dropdown "More ▾" + dynamic last-3 quick buttons |
+| 2026-05-28 | v4.13/w4.6 | Tokyo: fix ODPT URL, single-fetch all operators, add Arakawa tram |
+| 2026-05-28 | v4.12/w4.5 | Tokyo: switch from simulated to real ODPT data |
+| 2026-05-28 | v4.11/w4.4 | Helsinki Metro: M2 now red to distinguish from M1 orange |
+| 2026-05-28 | v4.10/w4.3 | Helsinki: trams (1–15) + commuter rail (I/K/L/P/R/T/U/X/Y/Z) with routes |
+| 2026-05-28 | v4.9 | Fix Sydney route ID matching — TfNSW uses prefix format (NSN_, ESI_, APS_…) |
+| 2026-05-28 | v4.8/w4.2 | Add Helsinki + Sydney — prototype routes + worker fetch functions |
+| 2026-05-28 | v4.7 | Remove ad system (CSS, HTML, JS) |
+| 2026-05-28 | v4.4 | Paris animation: snap-to-route replaces T-value projection (fixes wrong-direction jumps) |
+| 2026-05-28 | v4.0 | Route-constrained animation: `projectOnRouteT` + `routeSpeed` — trains stay on their line |
+| 2026-05-28 | w4.1 | Paris: distance cap on stop pairs — rejects multi-station PRIM gaps |
+| 2026-05-28 | w4.0 | NYC two-tier cache (30s fresh + 300s stale) — eliminates thundering-herd 503 loop |
+| 2026-05-28 | w3.9 | Paris: sort EstimatedCalls by departure time — fixes trains stuck at wrong direction |
+| 2026-05-28 | w3.8 | Paris: timestamp memoization + stale fallback — no more 503 under load |
+| 2026-05-28 | v4.2/w3.7 | Paris clock-driven animation: `seg {aLat,aLng,tDep,bLat,bLng,tArr}` from worker |
+| 2026-05-28 | v3.9 | Dead-reckoning animation between fetches (velocity extrapolation) |
+| 2026-05-28 | v3.5 | Tokyo routes rebuilt from OpenStreetMap station coordinates |
+| 2026-05-28 | v3.3/w3.3 | Seattle departure board (South Bellevue → Westlake, 2 Line) |
+| 2026-05-28 | v3.1 | Paris live data: PRIM SIRI Lite + 805-stop ID lookup table |
+| 2026-05-28 | v3.0 | Paris routes rebuilt from IDFM official station coordinates |
+| 2026-05-27 | v2.8 | Shinkansen timetable engine: 9 service types, clock-driven, no API |
+| 2026-05-27 | v1.9 | NYC routes rebuilt from real GTFS stop coordinates |
+| 2026-05-27 | v1.1 | Real MTA train data live; worker deployed; 15s polling |
+| 2026-05-26 | v1.0 | Initial prototype: Leaflet maps, simulated trains |
