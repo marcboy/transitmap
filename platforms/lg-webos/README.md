@@ -1,27 +1,69 @@
 # TransitMap — LG webOS
 
-## Status: stub (not yet built)
+## Quick start
 
-## Overview
-LG TVs run webOS, which — like Samsung Tizen — is a web app platform.
-The architecture is nearly identical to Samsung:
-- Same `platforms/shared/platform.js` (already handles `type === 'webos'`)
-- Same `build.js` approach (add an `--platform=lg` flag when we build it)
-- Same `tv-nav.js` D-pad navigation code
-- Different packaging: `.ipk` file instead of `.wgt`
+### 1. Build the app
+```bash
+node build.js
+# → generates index.html in this directory
+# Use --watch to auto-rebuild when the prototype changes:
+node build.js --watch
+```
 
-## Key differences from Samsung
+### 2. Package as .ipk
+```bash
+ares-package .
+# → generates com.marcboyer.transitmap_1.0.0_all.ipk
+```
 
-| | Samsung (Tizen) | LG (webOS) |
-|---|---|---|
-| Manifest | `config.xml` | `appinfo.json` ✓ (already created) |
-| Package format | `.wgt` | `.ipk` |
-| IDE | Tizen Studio | webOS Studio (VS Code extension) |
-| Back key code | 10009 | 461 ✓ (already in platform.js) |
-| IAP | Samsung Checkout | LG In-App Purchase API |
+### 3. Test on a real LG TV (Developer Mode)
+```bash
+# Enable Developer Mode on TV first (see below), then:
+ares-setup-device                              # add your TV (enter IP when prompted)
+ares-install --device <device-name> com.marcboyer.transitmap_1.0.0_all.ipk
+ares-launch --device <device-name> com.marcboyer.transitmap
+```
 
-## When ready to build
-1. Copy the Samsung `build.js` and adapt for webOS (different CSS insets if needed)
-2. Install [webOS Studio](https://webostv.developer.lge.com/develop/tools/webos-studio-introduction)
-3. Use `ares-package` CLI to generate the `.ipk`
-4. Sideload onto an LG TV via Developer Mode
+### 4. Test in the webOS TV Simulator
+Install [webOS Studio](https://marketplace.visualstudio.com/items?itemName=webostvsdk.webostv) (VS Code extension):
+- Command Palette → webOS: Launch Simulator
+- Drag and drop the .ipk onto the simulator
+
+## Enable Developer Mode on LG TV
+
+1. Press **Home** on the remote
+2. Navigate to **Settings (⚙)** → scroll to **Support** → **Software Info**
+3. **Rapidly press OK 5 times** on "Software Info" — a Developer Mode dialog appears
+4. Toggle **Developer Mode → On** and enter your Mac's IP address
+5. Install the [LG Developer Mode app](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app) from the LG Content Store on the TV
+
+## Remote control
+
+| Button | Action |
+|---|---|
+| ◀ Left | Previous city |
+| ▶ Right | Next city |
+| OK / Enter | Select city |
+| Back | Dismiss nav overlay / exit app |
+
+## Prerequisites
+
+```bash
+npm install -g @webosose/ares-cli   # packaging + device tools (already installed)
+```
+
+## Updating the app
+
+When `prototype/transitmap-prototype.html` is updated:
+```bash
+node build.js       # re-generate index.html
+ares-package .      # re-package .ipk
+```
+
+## Publishing to LG Content Store
+
+1. Create a developer account at https://seller.lgappstv.com
+2. Replace the placeholder `icon.png` and `icon-large.png` with real artwork
+   - `icon.png`: 80×80 px
+   - `icon-large.png`: 130×130 px
+3. Submit the `.ipk` through the LG Seller Lounge

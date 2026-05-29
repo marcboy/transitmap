@@ -1,6 +1,6 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-29 · 12:11 PT
+> **Last updated:** 2026-05-29 · 13:35 PT
 > **Prototype version:** v4.20 · **Worker version:** w4.7
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
@@ -233,6 +233,36 @@ node build.js --watch
 
 ---
 
+## Build & Deploy — LG webOS
+
+```bash
+# 1. Build the app
+cd platforms/lg-webos
+node build.js
+# → generates platforms/lg-webos/index.html
+
+# 2. Package as .ipk
+ares-package .
+# → generates com.marcboyer.transitmap_1.0.0_all.ipk
+
+# 3a. Add your LG TV as a device (one-time)
+ares-setup-device    # follow prompts: enter TV IP, port 3000, passphrase from TV
+
+# 3b. Install on TV (Developer Mode must be on)
+ares-install --device <device-name> com.marcboyer.transitmap_1.0.0_all.ipk
+
+# 3c. Launch
+ares-launch --device <device-name> com.marcboyer.transitmap
+```
+
+### Enable Developer Mode on LG TV
+1. Home → Settings → Support → **Software Info**
+2. **Rapidly press OK 5 times** on "Software Info" — Developer Mode dialog appears
+3. Toggle on, enter your Mac's IP
+4. Install the **LG Developer Mode app** from the LG Content Store
+
+---
+
 ## Other TV Platforms (future)
 
 | Platform | Approach | Effort | Key difference |
@@ -325,6 +355,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-29 | — | LG webOS app built: build.js + appinfo.json + ares-package → com.marcboyer.transitmap_1.0.0_all.ipk (34 KB); shares tv-nav.js + platform.js with Samsung |
 | 2026-05-29 | — | Tizen Studio 6.1 + Zulu JDK 8 installed; dev cert + TransitMapDev profile; `tizen package` produces signed `TransitMap.wgt`; PATH configured in `~/.zshrc` |
 | 2026-05-29 | — | Multi-platform structure: `platforms/shared/platform.js` (unified input/IAP API), `platforms/samsung/` (build.js + tv-nav.js + config.xml), stubs for LG / Android TV / Roku / Apple TV |
 | 2026-05-28 | v4.20 | Sydney: add T3 (Bankstown), T5 (Cumberland), T9 (Northern); extend T1 to Berowra/Penrith, T2 to Leppington, T4 to Waterfall + Cronulla branch, T8 to Campbelltown |
