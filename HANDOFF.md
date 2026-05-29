@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.19 (worker w4.7)  
+> **Prototype version:** v4.20 (worker w4.7)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -296,6 +296,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v4.20 | Sydney: add T3 (Bankstown), T5 (Cumberland loop), T9 (Northern to Hornsby); extend T1 North Shore to Berowra, T1 Western to Penrith, T2 to Leppington, T4 Illawarra to Waterfall + Cronulla branch, T8 to Campbelltown |
 | 2026-05-28 | v4.19 | City tier system: FREE_CITIES (NYC/Paris/Tokyo) + PREMIUM_CITIES (Seattle/Helsinki/Sydney/Shinkansen); unlockPremium() is Swift IAP callback; locked cities show 🔒 in dropdown; unlock modal |
 | 2026-05-28 | v4.18 | Light mode polish: switch tile to CartoDB Voyager (clear blue water); reduce train glow radius+opacity; softer route lines; dark rim on dots in light mode |
 | 2026-05-28 | v4.17 | Light/dark map toggle — ☀/🌑 button in topbar; CartoDB Voyager (grey city, blue water) vs dark_all; tint + fade-cover color switch on toggle |
