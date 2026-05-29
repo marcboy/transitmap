@@ -15,7 +15,7 @@ function parseTs(s) {
   return v;
 }
 
-const WORKER_VERSION = 'w4.8';
+const WORKER_VERSION = 'w4.9';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -1297,7 +1297,7 @@ export default {
       try {
         const trains = await fetchParisTrains(key);
         const resp   = json({ city:'paris', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
-        resp.headers.append('Cache-Control', 'public, max-age=60');
+        resp.headers.append('Cache-Control', 'public, max-age=120');
         const staleResp = resp.clone();
         staleResp.headers.set('Cache-Control', 'public, max-age=86400');
         ctx.waitUntil(Promise.all([
@@ -1609,10 +1609,25 @@ async function fetchParisTrains(apiKey) {
                          ?? journey?.DatedVehicleJourneyRef
                          ?? journey?.VehicleJourneyRef?.value
                          ?? journey?.VehicleJourneyRef ?? '';
+        const rawCalls = arr(journey?.EstimatedCalls?.EstimatedCall);
+        if (!rawCalls.length) continue;
+
+        // Fast O(n) window check before the O(n log n) sort.
+        // PRIM returns ~1000+ journeys for LineRef=ALL; most are finished or
+        // >10 min in the future and will never produce a visible train position.
+        // Skipping them here is the biggest CPU saving on this endpoint.
+        let minT = Infinity, maxT = -Infinity;
+        for (const c of rawCalls) {
+          const t = parseTs(c.ExpectedDepartureTime) ?? parseTs(c.AimedDepartureTime)
+                 ?? parseTs(c.ExpectedArrivalTime)   ?? parseTs(c.AimedArrivalTime);
+          if (t) { if (t < minT) minT = t; if (t > maxT) maxT = t; }
+        }
+        if (maxT < now - 120000) continue;  // journey ended > 2 min ago
+        if (minT > now + 600000) continue;  // journey starts > 10 min in future
+
         // Sort by departure time — PRIM returns calls in stop-sequence order which
         // is often NOT chronological (trains on loop segments, bidirectional lines).
         // Without sorting, adjacent pairs fail tArr > tDep and no segment is found.
-        const rawCalls = arr(journey?.EstimatedCalls?.EstimatedCall);
         rawCalls.sort((a, b) => {
           const tA = parseTs(a.ExpectedDepartureTime) ?? parseTs(a.AimedDepartureTime)
                   ?? parseTs(a.ExpectedArrivalTime)   ?? parseTs(a.AimedArrivalTime) ?? 0;

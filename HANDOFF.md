@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-29 · 14:31 PT
-> **Prototype version:** v4.20 · **Worker version:** w4.8
+> **Last updated:** 2026-05-29 · 14:37 PT
+> **Prototype version:** v4.20 · **Worker version:** w4.9
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev
@@ -74,7 +74,7 @@ PREMIUM_CITIES = ['seattle', 'helsinki', 'sydney', 'japan']
 
 **File:** `cloudflare-worker/index.js`
 **Deploy:** `cd cloudflare-worker && wrangler deploy`
-**Current version:** `w4.8` (constant `WORKER_VERSION` at top of file)
+**Current version:** `w4.9` (constant `WORKER_VERSION` at top of file)
 
 ### Secrets (set via `wrangler secret put SECRET_NAME`)
 | Secret | City | How to get |
@@ -100,7 +100,7 @@ PREMIUM_CITIES = ['seattle', 'helsinki', 'sydney', 'japan']
 
 ### Caching strategy
 - NYC: 30s fresh + 86400s stale fallback (prevents thundering-herd CPU limit failures)
-- Paris: 60s fresh + 86400s stale
+- Paris: 120s fresh + 86400s stale
 - All others: 15s fresh + 86400s stale
 - Stale cache served on compute failure — 24h TTL ensures cache survives long idle periods (TV off for hours)
 - 503s = Cloudflare CPU limit exceeded; cure is long stale TTL so warm-cache hits dominate
@@ -333,7 +333,7 @@ TZ='America/Los_Angeles' date '+%Y-%m-%d · %H:%M PT'   # → exact LAST_EDIT va
 
 After editing `cloudflare-worker/index.js`:
 
-1. Bump `WORKER_VERSION` constant (e.g. `'w4.8'` → `'w4.9'`)
+1. Bump `WORKER_VERSION` constant (e.g. `'w4.9'` → `'w4.10'`)
 2. Deploy: `cd cloudflare-worker && wrangler deploy`
 3. Note the deployed version ID in HANDOFF.md
 
@@ -357,6 +357,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-29 | w4.9 | Paris 503 fix: O(n) time-window pre-filter skips past/future journeys before sort; fresh cache 60s→120s; ~10× CPU reduction eliminates CPU-limit kills |
 | 2026-05-29 | — | LG webOS: screensaver prevention — Luna service `changeScreenSaverSettings` + synthetic mousemove every 60s; fixes screen going black during ambient display |
 | 2026-05-29 | w4.8 | Worker: stale TTL 300s→86400s for all cities (24h cache survives TV idle); add two-tier caching to Seattle (had none); eliminates LG TV 503s |
 | 2026-05-29 | — | LG webOS: restore city switcher + fetch log (LG Magic Remote is a pointer — mouse UI works); both hidden on Samsung D-pad-only build |
