@@ -10,7 +10,7 @@ After **every** code edit (prototype, worker, Swift app, or any other file), upd
 - Add a row to the **Change Log** table: `| YYYY-MM-DD | vX.X | one-line description |`
 - Update **Last updated** date in the header
 - If a bug is fixed, add a note explaining what was broken and what fixed it
-- When bumping the prototype version, also update `LAST_EDIT` in the prototype JS to the current date + Pacific Time (PT), format: `'YYYY-MM-DD · HH:MM PT'`
+- When bumping the prototype version, also update `LAST_EDIT` in the prototype JS to the **actual current Los Angeles time** — run `TZ='America/Los_Angeles' date '+%Y-%m-%d · %H:%M PT'` to get the exact value, format: `'YYYY-MM-DD · HH:MM PT'`
 - When bumping the worker version, also update `WORKER_VERSION` constant in `cloudflare-worker/index.js` (e.g. `'w4.2'` → `'w4.3'`)
 - Also update the `?v=X.X` query string in **both places** in `index.html` (the `<meta http-equiv="refresh">` and the `window.location.replace()` script) to match the new version — this busts the GitHub Pages CDN cache
 
