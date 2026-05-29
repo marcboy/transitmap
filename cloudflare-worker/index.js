@@ -15,7 +15,7 @@ function parseTs(s) {
   return v;
 }
 
-const WORKER_VERSION = 'w4.3';
+const WORKER_VERSION = 'w4.4';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -1006,11 +1006,11 @@ const HSL_FEED = 'https://realtime.hsl.fi/realtime/vehicle-positions/v2/hsl';
 
 // Exact-match map for Metro + Trams
 const HELSINKI_LINE_MAP = {
-  // Metro (orange)
+  // Metro — M1 orange, M2 red
   '31M1':  { line:'M1',  color:'#FF6319' },
   '31M1B': { line:'M1',  color:'#FF6319' },
-  '31M2':  { line:'M2',  color:'#FF6319' },
-  '31M2B': { line:'M2',  color:'#FF6319' },
+  '31M2':  { line:'M2',  color:'#E4003A' },
+  '31M2B': { line:'M2',  color:'#E4003A' },
   // Trams (HSL green) — agency 1, 3-digit route number
   '1001':  { line:'1',   color:'#007A33' },
   '1002':  { line:'2',   color:'#007A33' },

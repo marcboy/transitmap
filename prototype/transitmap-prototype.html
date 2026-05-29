@@ -243,7 +243,7 @@ const CITIES = {
     timezone: 'Europe/Helsinki',
     lines: [
       { id:'M1',  name:'M1',    color:'#FF6319' },
-      { id:'M2',  name:'M2',    color:'#FF6319' },
+      { id:'M2',  name:'M2',    color:'#E4003A' },
       { id:'tram',name:'Tram',  color:'#007A33' },
       { id:'I',   name:'I',     color:'#00B050' },
       { id:'K',   name:'K',     color:'#9B2335' },
@@ -267,7 +267,7 @@ const CITIES = {
         [60.205,25.119],[60.207,25.139],[60.208,25.151]
       ]},
       // Metro M2: Espoonlahti ↔ Mellunmäki
-      { id:'M2', color:'#FF6319', path:[
+      { id:'M2', color:'#E4003A', path:[
         [60.166,24.670],[60.172,24.689],[60.168,24.703],[60.163,24.715],
         [60.161,24.741],[60.165,24.764],[60.173,24.785],[60.185,24.806],
         [60.187,24.827],[60.179,24.821],[60.156,24.884],
@@ -1524,7 +1524,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.10', LAST_EDIT='2026-05-28 · 19:00 PT';
+const VERSION='v4.11', LAST_EDIT='2026-05-28 · 20:00 PT';
 
 function toPT(isoString) {
   if (!isoString) return '—';

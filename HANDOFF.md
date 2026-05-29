@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.10 (worker w4.3)  
+> **Prototype version:** v4.11 (worker w4.4)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -296,6 +296,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v4.11 | Helsinki Metro: M2 now red (#E4003A) to distinguish from M1 orange — worker w4.4 |
 | 2026-05-28 | v4.10 | Helsinki: add trams (1–15, green) + commuter rail (I/K/L/P/R/T/U/X/Y/Z) with individual colors + route paths — worker w4.3 |
 | 2026-05-28 | v4.9 | Fix Sydney route ID matching — TfNSW uses prefix format (NSN_, ESI_, APS_, etc.) not T1/T4; added T3/T5/T9 to legend; 134 trains live |
 | 2026-05-28 | v4.8 | Add Helsinki (HSL Metro M1/M2, free GTFS-RT) and Sydney (TfNSW T1/T2/T4/T8/Metro M1) — prototype routes + city buttons + worker w4.2 fetch functions |
