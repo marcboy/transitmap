@@ -1,0 +1,14 @@
+{
+  "id": "com.marcboyer.transitmap",
+  "version": "1.0.0",
+  "vendor": "Marc Boyer",
+  "type": "web",
+  "main": "index.html",
+  "title": "TransitMap",
+  "icon": "icon.png",
+  "largeIcon": "icon-large.png",
+  "bgColor": "#080c14",
+  "iconColor": "#080c14",
+  "splashBackground": "#080c14",
+  "resolution": "1920x1080"
+}
