@@ -1054,6 +1054,56 @@ function computeShinkansenTrains() {
   return result;
 }
 
+// ── Tokyo Metro — JST clock-driven timetable simulation ──────
+// Toei lines (A/S/I/E/AR) use real ODPT data from the worker.
+// Tokyo Metro (G/M/H/T/C/Y/Z/N/F) uses headway-based simulation
+// identical in approach to mini-tokyo-3d (no free real-time API).
+const METRO_SERVICES = [
+  { id:'G', interval:4,  dur:28 },  // Ginza:      Shibuya ↔ Asakusa
+  { id:'M', interval:4,  dur:55 },  // Marunouchi: Ogikubo ↔ Ikebukuro
+  { id:'H', interval:4,  dur:52 },  // Hibiya:     Naka-Meguro ↔ Kita-Senju
+  { id:'T', interval:4,  dur:65 },  // Tozai:      Nakano ↔ Nishi-Funabashi
+  { id:'C', interval:5,  dur:47 },  // Chiyoda:    Yoyogi-Uehara ↔ Ayase
+  { id:'Y', interval:5,  dur:55 },  // Yurakucho:  Wakoshi ↔ Shin-kiba
+  { id:'Z', interval:5,  dur:35 },  // Hanzomon:   Shibuya ↔ Oshiage
+  { id:'N', interval:5,  dur:42 },  // Namboku:    Meguro ↔ Akabane-Iwabuchi
+  { id:'F', interval:5,  dur:37 },  // Fukutoshin: Wakoshi ↔ Shibuya
+];
+
+function computeTokyoMetroTrains() {
+  const nowMin = jstNow();
+  const city = CITIES.tokyo;
+  const result = [];
+  for (const svc of METRO_SERVICES) {
+    const route = city.routes.find(r => r.id === svc.id);
+    if (!route || route.path.length < 2) continue;
+    const path = route.path;
+    const pathRev = path.slice().reverse();
+    const firstDep = 5 * 60, lastDep = 23 * 60;
+    for (const [dk, pts] of [['f', path], ['r', pathRev]]) {
+      for (let dep = firstDep; dep <= lastDep; dep += svc.interval) {
+        const elapsed = nowMin - dep;
+        if (elapsed < 0 || elapsed > svc.dur) continue;
+        const t = elapsed / svc.dur;
+        const pos = t * (pts.length - 1);
+        const i = Math.min(Math.floor(pos), pts.length - 2);
+        const f = pos - i;
+        const lat = pts[i][0] + f * (pts[i+1][0] - pts[i][0]);
+        const lng = pts[i][1] + f * (pts[i+1][1] - pts[i][1]);
+        const phase = ((dep * 31 + svc.id.charCodeAt(0) * 7 + (dk === 'r' ? 13 : 0)) % 628) / 100;
+        result.push({
+          id: `metro-${svc.id}-${dk}-${dep}`,
+          route: { id: svc.id, color: route.color, path },
+          real: true, animLat: lat, animLng: lng, realLat: lat, realLng: lng,
+          fetchTime: 0, routeT: 0, routeSpeed: 0,
+          status: 'MOVE', stopMs: 0, phase, seg: null,
+        });
+      }
+    }
+  }
+  return result;
+}
+
 // ── STATE ────────────────────────────────────────────────────
 let cityId = 'nyc';
 let trains = [];
@@ -1246,7 +1296,8 @@ async function fetchRealTrains() {
     if (cityId !== fetchedCity) return;
 
     const city   = CITIES[fetchedCity];
-    const agency = fetchedCity === 'nyc' ? 'MTA' : fetchedCity === 'paris' ? 'RATP' : 'Sound Transit';
+    const AGENCY_NAME = { nyc:'MTA', paris:'RATP', seattle:'Sound Transit', helsinki:'HSL', sydney:'Transport NSW', tokyo:'Toei (live) + Metro (timetable)' };
+    const agency = AGENCY_NAME[fetchedCity] ?? fetchedCity;
 
     // Build a lookup from the previous fetch.
     const prevPos = {};
@@ -1304,9 +1355,14 @@ async function fetchRealTrains() {
     });
 
     // Always update — even if count is low, stale data is worse than fewer trains
-    trains = realTrains;
+    // For Tokyo: Toei real trains are stored separately; render loop merges with Metro sim
+    if (fetchedCity === 'tokyo') {
+      _tokyoToeiTrains = realTrains;
+    } else {
+      trains = realTrains;
+      syncCount();
+    }
     isLive = true;
-    syncCount();
 
     // Show count + last updated time so it's obvious when data refreshed
     const now = new Date();
@@ -1502,18 +1558,32 @@ function drawTrains() {
 // ── RENDER LOOP ───────────────────────────────────────────────
 let last = 0;
 let lastJapanUpdate = 0;
+let lastTokyoMetroUpdate = 0;
+let _tokyoToeiTrains = []; // real Toei trains from ODPT; merged with Metro sim trains in render loop
 function loop(ts) {
   const dt = Math.min(ts-last, 100);
   last = ts;
   if (cityId === 'japan') {
-    // Refresh Shinkansen positions once per second (JST clock-driven)
     if (ts - lastJapanUpdate > 1000) {
       trains = computeShinkansenTrains();
       syncCount();
       lastJapanUpdate = ts;
     }
-    // Gentle pulse phase
     trains.forEach(tr => { tr.phase = (tr.phase + 0.002 * dt) % (Math.PI * 2); });
+  } else if (cityId === 'tokyo') {
+    // Merge real Toei trains (from worker) + simulated Metro trains (clock-driven)
+    if (ts - lastTokyoMetroUpdate > 1000) {
+      trains = [..._tokyoToeiTrains, ...computeTokyoMetroTrains()];
+      syncCount();
+      lastTokyoMetroUpdate = ts;
+    }
+    trains.forEach(tr => {
+      tr.phase += 0.05;
+      if (tr.status === 'STOP') {
+        tr.stopMs += dt;
+        if (tr.stopMs > 3000) { tr.status = 'MOVE'; tr.stopMs = 0; }
+      }
+    });
   } else {
     stepTrains(dt);
   }
@@ -1540,6 +1610,7 @@ function switchCity(id) {
       document.getElementById('statusLabel').textContent =
         `Timetable · ${trains.length} trains · JR Group · JST`;
     } else if (['nyc','paris','seattle','helsinki','sydney','tokyo'].includes(id)) {
+      if (id === 'tokyo') { _tokyoToeiTrains = []; lastTokyoMetroUpdate = 0; }
       spawnTrains();
       document.getElementById('statusLabel').textContent = 'Connecting…';
       fetchRealTrains();
@@ -1559,7 +1630,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.14', LAST_EDIT='2026-05-28 · 19:02 PT';
+const VERSION='v4.15', LAST_EDIT='2026-05-28 · 19:46 PT';
 
 function toPT(isoString) {
   if (!isoString) return '—';

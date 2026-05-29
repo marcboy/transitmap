@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
 > **Last updated:** 2026-05-28  
-> **Prototype version:** v4.14 (worker w4.6)  
+> **Prototype version:** v4.15 (worker w4.6)  
 > **Repo:** https://github.com/marcboy/transitmap  
 > **Live Prototype:** https://marcboy.github.io/transitmap/  
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev  
@@ -23,7 +23,7 @@ An ambient, art-like live transit map showing real subway train positions across
 | Seattle | ⏳ Real trains | Sound Transit OBA | **Needs OBA key** |
 | Helsinki | ✅ Real trains | HSL GTFS-RT vehicle positions (free, no key) | **Live** |
 | Sydney | ✅ Real trains | TfNSW GTFS-RT vehicle positions (prefix route IDs: NSN/ESI/APS/etc.) | **Live** |
-| Tokyo | ✅ Real trains | ODPT API (TokyoMetro + Toei, JSON, station midpoint interpolation) | **Live** |
+| Tokyo | ✅ Hybrid | Toei lines (A/S/I/E/AR): ODPT live · Tokyo Metro (G/M/H/T/C/Y/Z/N/F): headway timetable sim (same approach as mini-tokyo-3d) | **Live** |
 | Shinkansen | ✅ Timetable-driven | Official JR schedules (all lines) | **Live** |
 
 ---
@@ -296,6 +296,7 @@ Cities ready to add (all have GTFS-RT feeds):
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-28 | v4.15 | Tokyo Metro: 9 lines now use JST clock-driven headway simulation (same as mini-tokyo-3d); Toei keeps real ODPT data; merged in render loop |
 | 2026-05-28 | v4.14 | City switcher: dropdown "More ▾" + dynamic last-3 quick buttons; pickCity() tracks recents |
 | 2026-05-28 | v4.13 | Tokyo: fix ODPT URL (v4 not 4), single-fetch all operators, handle null toStation, add Arakawa tram — worker w4.6; note: key covers Toei only (no TokyoMetro) |
 | 2026-05-28 | v4.12 | Tokyo: switch from simulated to real ODPT data (ODPT JSON API, station midpoint positioning) — worker w4.5 |
