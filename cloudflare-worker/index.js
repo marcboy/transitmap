@@ -15,7 +15,7 @@ function parseTs(s) {
   return v;
 }
 
-const WORKER_VERSION = 'w4.7';
+const WORKER_VERSION = 'w4.8';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -1267,7 +1267,7 @@ export default {
         const resp      = json({ city:'nyc', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
         resp.headers.append('Cache-Control', 'public, max-age=30');
         const staleResp = resp.clone();
-        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        staleResp.headers.set('Cache-Control', 'public, max-age=86400');
         ctx.waitUntil(Promise.all([
           cache.put(cacheKey, resp.clone()),
           cache.put(staleKey, staleResp),
@@ -1299,7 +1299,7 @@ export default {
         const resp   = json({ city:'paris', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
         resp.headers.append('Cache-Control', 'public, max-age=60');
         const staleResp = resp.clone();
-        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        staleResp.headers.set('Cache-Control', 'public, max-age=86400');
         ctx.waitUntil(Promise.all([
           cache.put(cacheKey, resp.clone()),
           cache.put(staleKey, staleResp),
@@ -1341,10 +1341,22 @@ export default {
 if (path === '/trains/seattle') {
       const key = env.OBA_API_KEY;
       if (!key) return json({ error: 'OBA_API_KEY secret not set — run: wrangler secret put OBA_API_KEY' }, 500);
+      const cache    = caches.default;
+      const cacheKey = new Request(request.url);
+      const staleKey = new Request(request.url + '__stale');
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
       try {
         const trains = await fetchSeattleTrains(key);
-        return json({ city:'seattle', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const resp = json({ city:'seattle', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        resp.headers.append('Cache-Control', 'public, max-age=15');
+        const staleResp = resp.clone();
+        staleResp.headers.set('Cache-Control', 'public, max-age=86400');
+        ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
+        return resp;
       } catch (e) {
+        const stale = await cache.match(staleKey);
+        if (stale) return stale;
         return json({ error: e.message }, 500);
       }
     }
@@ -1416,7 +1428,7 @@ if (path === '/trains/seattle') {
         const resp = json({ city:'helsinki', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
         resp.headers.append('Cache-Control', 'public, max-age=15');
         const staleResp = resp.clone();
-        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        staleResp.headers.set('Cache-Control', 'public, max-age=86400');
         ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
         return resp;
       } catch (e) {
@@ -1439,7 +1451,7 @@ if (path === '/trains/seattle') {
         const resp = json({ city:'sydney', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
         resp.headers.append('Cache-Control', 'public, max-age=15');
         const staleResp = resp.clone();
-        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        staleResp.headers.set('Cache-Control', 'public, max-age=86400');
         ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
         return resp;
       } catch (e) {
@@ -1462,7 +1474,7 @@ if (path === '/trains/seattle') {
         const resp = json({ city:'tokyo', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
         resp.headers.append('Cache-Control', 'public, max-age=30');
         const staleResp = resp.clone();
-        staleResp.headers.set('Cache-Control', 'public, max-age=300');
+        staleResp.headers.set('Cache-Control', 'public, max-age=86400');
         ctx.waitUntil(Promise.all([cache.put(cacheKey, resp.clone()), cache.put(staleKey, staleResp)]));
         return resp;
       } catch (e) {
