@@ -27,6 +27,8 @@
   .city-name { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; color:#fff; line-height:1; }
   .city-sub  { font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-top:6px; }
   .status-pill { display:flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:7px 14px; font-size:11px; color:var(--muted); }
+  .theme-btn { font-family:'DM Mono',monospace; font-size:13px; padding:7px 14px; border-radius:20px; border:1px solid var(--border); cursor:pointer; color:var(--muted); background:var(--surface); transition:all 0.25s; pointer-events:auto; line-height:1; }
+  .theme-btn:hover { color:#fff; border-color:rgba(255,255,255,0.3); }
   .pulse-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 8px #4ade80; animation:blink 2s ease-in-out infinite; }
   @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
@@ -113,9 +115,12 @@
     <div class="city-sub">Live Transit &middot; <span id="trainCountInline">0</span> trains active</div>
     <div class="city-sub" id="localTime" style="margin-top:4px; letter-spacing:1px;"></div>
   </div>
-  <div class="status-pill">
-    <div class="pulse-dot"></div>
-    <span id="statusLabel">Loading&hellip;</span>
+  <div style="display:flex;align-items:center;gap:10px;pointer-events:auto;">
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle map theme">☀</button>
+    <div class="status-pill">
+      <div class="pulse-dot"></div>
+      <span id="statusLabel">Loading&hellip;</span>
+    </div>
   </div>
 </div>
 
@@ -1173,9 +1178,23 @@ leafletMap = L.map('leaflet-map', {
   zoomDelta:          0.5,
 });
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  maxZoom: 19,
-}).addTo(leafletMap);
+const TILE_URLS = {
+  dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+};
+let mapTheme = 'dark';
+let tileLayer = L.tileLayer(TILE_URLS.dark, { maxZoom: 19 }).addTo(leafletMap);
+
+function toggleTheme() {
+  mapTheme = mapTheme === 'dark' ? 'light' : 'dark';
+  leafletMap.removeLayer(tileLayer);
+  tileLayer = L.tileLayer(TILE_URLS[mapTheme], { maxZoom: 19 }).addTo(leafletMap);
+  document.getElementById('tint').style.background =
+    mapTheme === 'dark' ? 'rgba(4,8,18,0.2)' : 'rgba(0,0,0,0)';
+  document.documentElement.style.setProperty('--bg',
+    mapTheme === 'dark' ? '#080c14' : '#dce4ec');
+  document.getElementById('themeBtn').textContent = mapTheme === 'dark' ? '☀' : '🌑';
+}
 
 routeLayer = L.layerGroup().addTo(leafletMap);
 
@@ -1678,7 +1697,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.16', LAST_EDIT='2026-05-28 · 20:02 PT';
+const VERSION='v4.17', LAST_EDIT='2026-05-28 · 20:09 PT';
 
 function toPT(isoString) {
   if (!isoString) return '—';
