@@ -48,8 +48,8 @@ const TV_CSS = `
   .version-stamp { font-size: 13px; }
   /* Hide elements that don't work on TV */
   #departures-panel { display: none !important; }
-  /* Theme button is pointless on TV (always dark) */
-  .theme-btn { display: none !important; }
+  /* Theme button — sized for 10-foot viewing, clickable via Magic Remote */
+  .theme-btn { font-size: 16px; padding: 10px 20px; }
   /* City switcher — keep visible: LG Magic Remote works as a pointer */
   .city-switcher { top: 60px; }
   /* Fetch log — keep visible, repositioned into safe zone */

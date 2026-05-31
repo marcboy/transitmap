@@ -42,8 +42,8 @@ const TV_CSS = `
   #departures-panel { display: none !important; }
   /* Hide the mouse-centric city switcher — TV uses D-pad overlay instead */
   .city-switcher { display: none !important; }
-  /* Theme button is pointless on TV (always dark) */
-  .theme-btn { display: none !important; }
+  /* Theme button — sized for 10-foot viewing */
+  .theme-btn { font-size: 16px; padding: 10px 20px; }
   /* TV city nav overlay */
   #tvNav {
     position: fixed; bottom: 0; left: 0; right: 0;

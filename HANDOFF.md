@@ -1,6 +1,6 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-29 · 15:13 PT
+> **Last updated:** 2026-05-31 · 12:56 PT
 > **Prototype version:** v4.20 · **Worker version:** w4.10
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
@@ -366,6 +366,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-31 | — | LG + Samsung builds: show light/dark theme toggle button (was hidden); sized 16px/10px·20px for 10-foot viewing |
 | 2026-05-29 | w4.10 | Worker: KV three-tier fallback for all cities — edge stale wiped on deploy, KV persists; permanently fixes post-deploy Paris 503s |
 | 2026-05-29 | — | LG webOS: screensaver — canvas.captureStream(1fps)→hidden video; OS sees live video and never idles; opacity:0.01, alternating colour every 1s |
 | 2026-05-29 | — | LG webOS: version stamp 10px→13px (readable on TV); worker version pre-populated at build time (visible immediately, not just after first fetch) |
