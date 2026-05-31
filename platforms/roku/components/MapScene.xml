@@ -48,6 +48,13 @@
            color="0xFFFFFF44"
            text=""/>
 
+    <!-- 6-KIDS logo — bottom-right, above bottom bar -->
+    <Poster id="logoImg"
+            uri="pkg:/images/sixkids_logo.png"
+            width="390" height="50"
+            translation="[1490, 892]"
+            opacity="0.8"/>
+
     <!-- Invisible full-screen focus target for key handling -->
     <Rectangle id="focusTrap" width="1920" height="1080" color="0x00000000"/>
 

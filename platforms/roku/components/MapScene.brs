@@ -114,12 +114,10 @@ sub onResult()
         if inBounds
             p = project(lat, lon, bounds)
             dot = CreateObject("roSGNode", "Rectangle")
-            dot.width = 10
-            dot.height = 10
-            ' Val("&hRRGGBBAA") converts hex string to integer.
-            ' String assignment to color field renders black on some firmware.
+            dot.width = 14
+            dot.height = 14
             dot.color = colorFromHex(t.color)
-            dot.translation = [p.x - 5, p.y - 5]
+            dot.translation = [p.x - 7, p.y - 7]
             layer.appendChild(dot)
             m.dots.push(dot)
             visible += 1
@@ -143,12 +141,11 @@ sub clearDots()
     m.dots = []
 end sub
 
-' Convert CSS "#RRGGBB" to a BrightScript integer color (RRGGBBAA).
-' Using Val("&hRRGGBBAA") so the Rectangle.color field gets a proper integer,
-' not a string (string-to-color coercion is unreliable on some firmware).
-Function colorFromHex(hex as String) as Integer
-    if hex = invalid or Len(hex) < 7 then return &hFFFFFFFF
-    return Val("&h" + Mid(hex, 2, 6) + "FF")
+' Convert CSS "#RRGGBB" to a SceneGraph color string "0xRRGGBBAA".
+' Returning a string avoids 32-bit signed integer overflow for bright colors.
+Function colorFromHex(hex as String) as String
+    if hex = invalid or Len(hex) < 7 then return "0xFFFFFFFF"
+    return "0x" + Mid(hex, 2, 6) + "FF"
 End Function
 
 Function mercY(lat as Float) as Float
