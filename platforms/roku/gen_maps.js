@@ -61,7 +61,7 @@ async function generate(city) {
   const map = new StaticMaps({ width: W, height: H, tileUrl: TILE, tileSize: 256 });
   await map.render(city.center, city.zoom);
   const out = path.join(OUT, `map_${city.id}.jpg`);
-  await map.image.save(out, 'image/jpeg', 85);
+  await map.image.save(out, { quality: 85 });
 
   const b = computeBounds(city.center, city.zoom);
   return { id: city.id, bounds: b };

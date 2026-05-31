@@ -6,32 +6,32 @@ sub init()
         {
             id: "nyc", name: "New York", sub: "MTA SUBWAY",
             img: "pkg:/images/map_nyc.jpg",
-            bounds: {minLon: -74.335, maxLon: -73.677, minLat: 40.480, maxLat: 40.948}
+            bounds: {minLon: -74.336, maxLon: -73.676, minLat: 40.572, maxLat: 40.853}
         },
         {
             id: "paris", name: "Paris", sub: "RATP METRO",
             img: "pkg:/images/map_paris.jpg",
-            bounds: {minLon: 2.100, maxLon: 2.620, minLat: 48.720, maxLat: 49.005}
+            bounds: {minLon: 2.017, maxLon: 2.677, minLat: 48.738, maxLat: 48.982}
         },
         {
             id: "helsinki", name: "Helsinki", sub: "HSL TRANSIT",
             img: "pkg:/images/map_helsinki.jpg",
-            bounds: {minLon: 24.620, maxLon: 25.240, minLat: 59.990, maxLat: 60.350}
+            bounds: {minLon: 24.610, maxLon: 25.270, minLat: 60.078, maxLat: 60.262}
         },
         {
             id: "sydney", name: "Sydney", sub: "TFNSW TRAINS",
             img: "pkg:/images/map_sydney.jpg",
-            bounds: {minLon: 150.880, maxLon: 151.540, minLat: -34.100, maxLat: -33.650}
+            bounds: {minLon: 150.880, maxLon: 151.540, minLat: -34.024, maxLat: -33.716}
         },
         {
             id: "tokyo", name: "Tokyo", sub: "TOEI AND METRO",
             img: "pkg:/images/map_tokyo.jpg",
-            bounds: {minLon: 139.440, maxLon: 140.060, minLat: 35.450, maxLat: 35.850}
+            bounds: {minLon: 139.390, maxLon: 140.050, minLat: 35.539, maxLat: 35.840}
         },
         {
             id: "seattle", name: "Seattle", sub: "SOUND TRANSIT",
             img: "pkg:/images/map_seattle.jpg",
-            bounds: {minLon: -122.620, maxLon: -121.960, minLat: 47.440, maxLat: 47.820}
+            bounds: {minLon: -122.660, maxLon: -122.000, minLat: 47.485, maxLat: 47.735}
         }
     ]
 
