@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-31 · 12:56 PT
-> **Prototype version:** v4.20 · **Worker version:** w4.10
+> **Last updated:** 2026-05-31 · 13:09 PT
+> **Prototype version:** v4.21 · **Worker version:** w4.10
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev
@@ -366,6 +366,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-31 | v4.21 | 6-KIDS logo: inline SVG bottom-right corner above version stamps; transparent background, 110px wide, 85% opacity |
 | 2026-05-31 | — | LG + Samsung builds: show light/dark theme toggle button (was hidden); sized 16px/10px·20px for 10-foot viewing |
 | 2026-05-29 | w4.10 | Worker: KV three-tier fallback for all cities — edge stale wiped on deploy, KV persists; permanently fixes post-deploy Paris 503s |
 | 2026-05-29 | — | LG webOS: screensaver — canvas.captureStream(1fps)→hidden video; OS sees live video and never idles; opacity:0.01, alternating colour every 1s |
