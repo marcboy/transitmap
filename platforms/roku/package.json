@@ -1,0 +1,11 @@
+{
+  "name": "transitmap-roku-tools",
+  "version": "1.0.0",
+  "description": "Map image generator for the TransitMap Roku channel",
+  "scripts": {
+    "gen-maps": "node gen_maps.js"
+  },
+  "dependencies": {
+    "staticmaps": "^1.10.4"
+  }
+}
