@@ -113,11 +113,11 @@ sub onResult()
         inBounds = lon >= bounds.minLon and lon <= bounds.maxLon and lat >= bounds.minLat and lat <= bounds.maxLat
         if inBounds
             p = project(lat, lon, bounds)
-            dot = CreateObject("roSGNode", "Rectangle")
-            dot.width = 14
-            dot.height = 14
+            dot = CreateObject("roSGNode", "Label")
+            dot.text = Chr(9679)
             dot.color = colorFromHex(t.color)
-            dot.translation = [p.x - 7, p.y - 7]
+            dot.font = "font:SmallestSystemFont"
+            dot.translation = [p.x - 9, p.y - 11]
             layer.appendChild(dot)
             m.dots.push(dot)
             visible += 1

@@ -1,13 +1,12 @@
 #!/usr/bin/env node
-// Generate static dark map background images for each city.
-// Uses the same CartoDB dark tile set as the web prototype.
+// Generate static dark map background images for each city, with transit
+// routes pre-rendered as coloured polylines on top of the CartoDB dark tiles.
 //
 // Usage:
 //   npm install        ← first time only
 //   node gen_maps.js   ← writes images/map_*.jpg + prints bounds for MapScene.brs
 //
 // After running, copy the printed bounds into MapScene.brs if they differ.
-// Commit the images to git (or keep them local — they're ~300 KB each).
 
 const StaticMaps = require('staticmaps');
 const path = require('path');
@@ -27,23 +26,23 @@ const CITIES = [
   { id: 'seattle',  center: [-122.330, 47.610], zoom: 12 },
 ];
 
+// Route geometry extracted from prototype/transitmap-prototype.html.
+// coords are [lon, lat] as required by staticmaps (prototype stores [lat, lon]).
+const ROUTES = require('./routes.json');
+
 // Compute the geographic bounding box of the rendered image.
-// staticmaps centres the map at `center` at the given zoom level.
 function computeBounds(center, zoom) {
   const [lon, lat] = center;
   const z2 = Math.pow(2, zoom);
 
-  // Centre tile coordinates (fractional)
   const tileX = (lon + 180) / 360 * z2;
   const latRad = lat * Math.PI / 180;
   const tileY  = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * z2;
 
-  const halfTX = W / 256 / 2;   // tiles that fit on each side horizontally
-  const halfTY = H / 256 / 2;   // tiles that fit on each side vertically
+  const halfTX = W / 256 / 2;
+  const halfTY = H / 256 / 2;
 
-  function tileToLon(x) {
-    return x / z2 * 360 - 180;
-  }
+  function tileToLon(x) { return x / z2 * 360 - 180; }
   function tileToLat(y) {
     const n = Math.PI - 2 * Math.PI * y / z2;
     return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
@@ -59,6 +58,18 @@ function computeBounds(center, zoom) {
 
 async function generate(city) {
   const map = new StaticMaps({ width: W, height: H, tileUrl: TILE, tileSize: 256 });
+
+  // Add route polylines before rendering so they appear over the tiles.
+  const routes = ROUTES[city.id] || [];
+  for (const route of routes) {
+    if (!route.path || route.path.length < 2) continue;
+    map.addLine({
+      coords: route.path,   // already [lon, lat] order
+      color:  route.color + 'CC',  // ~80% opacity
+      width:  3,
+    });
+  }
+
   await map.render(city.center, city.zoom);
   const out = path.join(OUT, `map_${city.id}.jpg`);
   await map.image.save(out, { quality: 85 });
@@ -69,7 +80,7 @@ async function generate(city) {
 
 (async () => {
   if (!fs.existsSync(OUT)) fs.mkdirSync(OUT);
-  console.log('Generating city maps…\n');
+  console.log('Generating city maps with routes…\n');
 
   const results = [];
   for (const city of CITIES) {
@@ -85,5 +96,5 @@ async function generate(city) {
     console.log(`  ' ${r.id}`);
     console.log(`  bounds: {minLon: ${b.minLon.toFixed(3)}, maxLon: ${b.maxLon.toFixed(3)}, minLat: ${b.minLat.toFixed(3)}, maxLat: ${b.maxLat.toFixed(3)}}`);
   }
-  console.log('\nDone. Run "awk" to package the Roku channel (see README.md).');
+  console.log('\nDone.');
 })();
