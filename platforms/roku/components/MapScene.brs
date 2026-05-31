@@ -55,7 +55,7 @@ sub switchCity(idx as Integer)
 
     m.top.findNode("mapBg").uri = city.img
     m.top.findNode("cityName").text = city.name
-    m.top.findNode("citySub").text = city.sub
+    m.top.findNode("citySub").text = city.sub + "  Connecting..."
     m.top.findNode("workerVer").text = ""
 
     clearDots()
@@ -81,18 +81,32 @@ end sub
 
 sub onResult()
     data = m.fetchTask.result
-    if data = invalid then return
+    city = m.cities[m.cityIdx]
+
+    if data = invalid
+        m.top.findNode("citySub").text = city.sub + "  No response"
+        return
+    end if
+
+    if data.fetchError <> invalid
+        m.top.findNode("citySub").text = city.sub + "  ERR: " + data.fetchError
+        return
+    end if
 
     trains = data.trains
-    if trains = invalid then return
+    if trains = invalid
+        m.top.findNode("citySub").text = city.sub + "  No trains field"
+        return
+    end if
 
-    city = m.cities[m.cityIdx]
     bounds = city.bounds
     layer = m.top.findNode("trainLayer")
 
     clearDots()
 
+    total = trains.count()
     visible = 0
+
     for each t in trains
         lat = t.lat
         lon = t.lon
@@ -100,18 +114,21 @@ sub onResult()
         if inBounds
             p = project(lat, lon, bounds)
             dot = CreateObject("roSGNode", "Rectangle")
-            dot.width = 9
-            dot.height = 9
-            dot.color = hexToRoku(t.color)
-            dot.translation = [p.x - 4, p.y - 4]
+            dot.width = 10
+            dot.height = 10
+            ' Val("&hRRGGBBAA") converts hex string to integer.
+            ' String assignment to color field renders black on some firmware.
+            dot.color = colorFromHex(t.color)
+            dot.translation = [p.x - 5, p.y - 5]
             layer.appendChild(dot)
             m.dots.push(dot)
             visible += 1
         end if
     end for
 
-    countStr = Substitute(Str(visible), " ", "")
-    m.top.findNode("citySub").text = city.sub + "  " + countStr + " TRAINS"
+    totalStr   = Substitute(Str(total),   " ", "")
+    visibleStr = Substitute(Str(visible), " ", "")
+    m.top.findNode("citySub").text = city.sub + "  " + visibleStr + " / " + totalStr
 
     if data.workerVersion <> invalid
         m.top.findNode("workerVer").text = data.workerVersion
@@ -126,6 +143,14 @@ sub clearDots()
     m.dots = []
 end sub
 
+' Convert CSS "#RRGGBB" to a BrightScript integer color (RRGGBBAA).
+' Using Val("&hRRGGBBAA") so the Rectangle.color field gets a proper integer,
+' not a string (string-to-color coercion is unreliable on some firmware).
+Function colorFromHex(hex as String) as Integer
+    if hex = invalid or Len(hex) < 7 then return &hFFFFFFFF
+    return Val("&h" + Mid(hex, 2, 6) + "FF")
+End Function
+
 Function mercY(lat as Float) as Float
     r = lat * 3.14159265358979 / 180.0
     return Log(Tan(r / 2.0 + 3.14159265358979 / 4.0))
@@ -133,16 +158,11 @@ End Function
 
 Function project(lat as Float, lon as Float, bounds as Object) as Object
     x = Int((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon) * 1920.0)
-    yM = mercY(lat)
+    yM    = mercY(lat)
     yMmin = mercY(bounds.minLat)
     yMmax = mercY(bounds.maxLat)
     y = Int((1.0 - (yM - yMmin) / (yMmax - yMmin)) * 1080.0)
     return {x: x, y: y}
-End Function
-
-Function hexToRoku(hex as String) as String
-    if hex = invalid or Len(hex) < 7 then return "0xFFFFFFFF"
-    return "0x" + Mid(hex, 2, 6) + "FF"
 End Function
 
 Function onKeyEvent(key as String, press as Boolean) as Boolean
