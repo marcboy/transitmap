@@ -33,30 +33,54 @@ function readWorkerVersion() {
 const TV_CSS = `
   /* ── LG webOS overrides ── */
   * { cursor: none !important; }
-  /* Safe zone: keep all UI within the inner 90% of the screen */
-  .topbar  { padding: 60px 80px 24px; }
-  .legend  { padding: 28px 80px 60px; }
+
+  /* Safe zone */
+  .topbar { padding: 60px 80px 30px; }
+  .legend { padding: 28px 80px 60px; }
+
+  /* City info — top left, 10-foot readable */
+  .city-name { font-size: 56px; }
+  .city-sub  { font-size: 20px; letter-spacing: 3px; margin-top: 10px; }
+
+  /* Status pill — top right */
+  .status-pill { font-size: 18px; padding: 12px 24px; gap: 10px; }
+  .pulse-dot   { width: 10px; height: 10px; }
+
+  /* Big train count — bottom right */
+  .train-count       { right: 80px; bottom: 140px; font-size: 16px; }
+  .train-count span  { font-size: 36px; }
+
+  /* Transit line chips — bottom left */
+  .line-chip { font-size: 16px; padding: 8px 16px 8px 10px; border-radius: 24px; }
+  .line-dot  { width: 15px; height: 15px; }
+  .lines-row { gap: 8px; }
+
+  /* Version stamps */
+  .version-stamp { font-size: 14px; }
+
+  /* Theme button */
+  .theme-btn { font-size: 18px; padding: 12px 24px; }
+
+  /* City switcher — keep visible; Magic Remote works as pointer */
   .city-switcher { top: 60px; }
-  .train-count { right: 80px; bottom: 130px; }
-  /* Larger text for 10-foot viewing */
-  .city-name { font-size: 38px; }
-  .city-sub  { font-size: 14px; letter-spacing: 3px; }
-  .status-pill { font-size: 14px; padding: 10px 20px; }
-  .line-chip { font-size: 14px; padding: 6px 14px 6px 8px; }
-  .line-dot  { width: 13px; height: 13px; }
-  /* Version stamps — readable at 10-foot viewing distance */
-  .version-stamp { font-size: 13px; }
-  /* Hide elements that don't work on TV */
+
+  /* Fetch log — debug panel, top right below the topbar */
+  #fetch-log {
+    display: block !important;
+    top: 260px; right: 80px;
+    font-size: 14px; max-width: 460px;
+    background: rgba(4,8,16,0.95);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 12px;
+    padding: 16px 20px;
+  }
+  #fetch-log .fl-hdr       { font-size: 12px; }
+  #fetch-log .fl-stat-name { font-size: 12px; }
+  #fetch-log .fl-stat-nums { font-size: 15px; }
+  #fetch-log .fl-row       { font-size: 13px; }
+
+  /* Hide departures (not usable without pointer precision) */
   #departures-panel { display: none !important; }
-  /* Theme button — sized for 10-foot viewing, clickable via Magic Remote */
-  .theme-btn { font-size: 16px; padding: 10px 20px; }
-  /* City switcher — keep visible: LG Magic Remote works as a pointer */
-  .city-switcher { top: 60px; }
-  /* Fetch log — keep visible, repositioned into safe zone */
-  #fetch-log { top: 100px; right: 80px; font-size: 12px; max-width: 380px; }
-  #fetch-log .fl-hdr { font-size: 11px; }
-  #fetch-log .fl-stat-name { font-size: 11px; }
-  #fetch-log .fl-stat-nums { font-size: 13px; }
   /* TV city nav overlay */
   #tvNav {
     position: fixed; bottom: 0; left: 0; right: 0;
