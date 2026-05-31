@@ -109,7 +109,7 @@ sub onResult()
 
     for each t in trains
         lat = t.lat
-        lon = t.lon
+        lon = t.lng
         inBounds = lon >= bounds.minLon and lon <= bounds.maxLon and lat >= bounds.minLat and lat <= bounds.maxLat
         if inBounds
             p = project(lat, lon, bounds)
