@@ -1,6 +1,6 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-31 · 14:49 PT
+> **Last updated:** 2026-05-31 · 14:53 PT
 > **Prototype version:** v4.22 · **Worker version:** w4.10
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
@@ -366,6 +366,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-31 | — | Roku: scale logo to 187×24 (matches SmallSystemFont height), inline with worker version row; pull workerVer width to 1640 to avoid overlap |
 | 2026-05-31 | — | Roku: fix train dots — colorFromHex returns string "0xRRGGBBAA" (was integer, overflowed signed 32-bit); dots 14×14; add 6-KIDS logo PNG (bottom-right, above bar) |
 | 2026-05-31 | — | Roku channel: manifest + BrightScript/SceneGraph skeleton; FetchTask (HTTP), MapScene (train dots via Mercator projection), gen_maps.js (CartoDB tile stitcher) |
 | 2026-05-31 | v4.22 | OLED protection: pixel-shift body ±3px through 9-position grid every 3 min; 2s CSS transition makes shift imperceptible |

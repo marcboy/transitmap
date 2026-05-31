@@ -39,20 +39,20 @@
            color="0xFFFFFF44"
            text="&lt; &gt;  change city"/>
 
-    <!-- Worker version (far right) -->
+    <!-- Worker version (right of center, logo sits to its right) -->
     <Label id="workerVer"
            translation="[0, 1008]"
-           width="1840"
+           width="1640"
            horizAlign="right"
            font="font:SmallSystemFont"
            color="0xFFFFFF44"
            text=""/>
 
-    <!-- 6-KIDS logo — bottom-right, above bottom bar -->
+    <!-- 6-KIDS logo — bottom-right, same line as worker version -->
     <Poster id="logoImg"
             uri="pkg:/images/sixkids_logo.png"
-            width="390" height="50"
-            translation="[1490, 892]"
+            width="187" height="24"
+            translation="[1693, 1004]"
             opacity="0.8"/>
 
     <!-- Invisible full-screen focus target for key handling -->
