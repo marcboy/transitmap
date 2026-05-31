@@ -103,8 +103,7 @@ sub onResult()
     for each t in trains
         lat = t.lat
         lon = t.lon
-        if lon >= bounds.minLon and lon <= bounds.maxLon _
-           and lat >= bounds.minLat and lat <= bounds.maxLat
+        if lon >= bounds.minLon and lon <= bounds.maxLon and lat >= bounds.minLat and lat <= bounds.maxLat
             p = project(lat, lon, bounds)
             dot = CreateObject("roSGNode", "Rectangle")
             dot.width  = 9
@@ -118,7 +117,7 @@ sub onResult()
     end for
 
     countStr = Substitute(Str(visible), " ", "")
-    m.top.findNode("citySub").text = city.sub + " · " + countStr + " TRAINS"
+    m.top.findNode("citySub").text = city.sub + "  " + countStr + " TRAINS"
 
     if data.workerVersion <> invalid
         m.top.findNode("workerVer").text = data.workerVersion
