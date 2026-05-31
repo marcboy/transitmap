@@ -1,9 +1,7 @@
 sub init()
     m.WORKER = "https://transitmap.marcboyer-public.workers.dev"
-    m.FETCH_INTERVAL = 30 ' seconds
+    m.FETCH_INTERVAL = 30
 
-    ' City definitions.
-    ' bounds = geographic extent of the 1920x1080 map PNG (gen_maps.js outputs these).
     m.cities = [
         {
             id: "nyc", name: "New York", sub: "MTA SUBWAY",
@@ -26,7 +24,7 @@ sub init()
             bounds: {minLon: 150.880, maxLon: 151.540, minLat: -34.100, maxLat: -33.650}
         },
         {
-            id: "tokyo", name: "Tokyo", sub: "TOEI & METRO",
+            id: "tokyo", name: "Tokyo", sub: "TOEI AND METRO",
             img: "pkg:/images/map_tokyo.jpg",
             bounds: {minLon: 139.440, maxLon: 140.060, minLat: 35.450, maxLat: 35.850}
         },
@@ -41,7 +39,6 @@ sub init()
     m.dots = []
     m.fetchTask = invalid
 
-    ' Periodic refresh timer
     m.timer = CreateObject("roSGNode", "Timer")
     m.timer.duration = m.FETCH_INTERVAL
     m.timer.repeat = true
@@ -51,8 +48,6 @@ sub init()
 
     switchCity(0)
 end sub
-
-' ── City switching ────────────────────────────────────────────────────────────
 
 sub switchCity(idx as Integer)
     m.cityIdx = idx
@@ -69,8 +64,6 @@ sub switchCity(idx as Integer)
     startFetch()
     m.timer.control = "start"
 end sub
-
-' ── Fetching ──────────────────────────────────────────────────────────────────
 
 sub onTimer()
     startFetch()
@@ -103,16 +96,17 @@ sub onResult()
     for each t in trains
         lat = t.lat
         lon = t.lon
-        if lon >= bounds.minLon and lon <= bounds.maxLon and lat >= bounds.minLat and lat <= bounds.maxLat
+        inBounds = lon >= bounds.minLon and lon <= bounds.maxLon and lat >= bounds.minLat and lat <= bounds.maxLat
+        if inBounds
             p = project(lat, lon, bounds)
             dot = CreateObject("roSGNode", "Rectangle")
-            dot.width  = 9
+            dot.width = 9
             dot.height = 9
-            dot.color  = hexToRoku(t.color)
+            dot.color = hexToRoku(t.color)
             dot.translation = [p.x - 4, p.y - 4]
             layer.appendChild(dot)
             m.dots.push(dot)
-            visible++
+            visible += 1
         end if
     end for
 
@@ -132,9 +126,6 @@ sub clearDots()
     m.dots = []
 end sub
 
-' ── Coordinate projection ─────────────────────────────────────────────────────
-' Web Mercator: lat/lon → pixel on 1920×1080 PNG with the given geographic bounds.
-
 Function mercY(lat as Float) as Float
     r = lat * 3.14159265358979 / 180.0
     return Log(Tan(r / 2.0 + 3.14159265358979 / 4.0))
@@ -142,21 +133,17 @@ End Function
 
 Function project(lat as Float, lon as Float, bounds as Object) as Object
     x = Int((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon) * 1920.0)
-    yM    = mercY(lat)
+    yM = mercY(lat)
     yMmin = mercY(bounds.minLat)
     yMmax = mercY(bounds.maxLat)
     y = Int((1.0 - (yM - yMmin) / (yMmax - yMmin)) * 1080.0)
     return {x: x, y: y}
 End Function
 
-' ── Colour helpers ────────────────────────────────────────────────────────────
-
 Function hexToRoku(hex as String) as String
     if hex = invalid or Len(hex) < 7 then return "0xFFFFFFFF"
     return "0x" + Mid(hex, 2, 6) + "FF"
 End Function
-
-' ── Key handling ─────────────────────────────────────────────────────────────
 
 Function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
