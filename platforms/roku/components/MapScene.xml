@@ -12,6 +12,34 @@
     <!-- Train dots appended here dynamically -->
     <Group id="trainLayer"/>
 
+    <!-- Top-left info panel (city name, train count, local time) -->
+    <Rectangle id="topBar" width="1920" height="220"
+               translation="[0, 0]" color="0x080C14F0"/>
+
+    <Label id="topCityName"
+           translation="[80, 52]"
+           font="font:LargeBoldSystemFont"
+           color="0xFFFFFFFF"
+           text=""/>
+
+    <Label id="topSub"
+           translation="[80, 112]"
+           font="font:SmallSystemFont"
+           color="0xFFFFFF88"
+           text=""/>
+
+    <Label id="topTrains"
+           translation="[80, 144]"
+           font="font:SmallSystemFont"
+           color="0xFFFFFFCC"
+           text=""/>
+
+    <Label id="topTime"
+           translation="[80, 176]"
+           font="font:SmallSystemFont"
+           color="0xFFFFFF66"
+           text=""/>
+
     <!-- Bottom gradient bar -->
     <Rectangle id="bottomBar" width="1920" height="130"
                translation="[0, 950]" color="0x04080EF0"/>

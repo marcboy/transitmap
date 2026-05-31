@@ -1,6 +1,6 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-31 · 15:28 PT
+> **Last updated:** 2026-05-31 · 15:52 PT
 > **Prototype version:** v4.22 · **Worker version:** w4.10
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
@@ -366,6 +366,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-31 | — | Roku: add top-left info panel — city name (LargeBold), system name, train count, local time with per-city timezone (tzBase+DST); localTimeStr() function |
 | 2026-05-31 | — | LG webOS: bump city name 56px, city-sub 20px, train count 36px, line chips 16px, fetch-log 14px at top:260px right:80px (below topbar, always visible) |
 | 2026-05-31 | — | Roku: transit routes baked into map backgrounds via gen_maps.js (addLine polylines); train markers switched to Label+Chr(9679) circles; routes.json extracted from prototype |
 | 2026-05-31 | — | Roku: scale logo to 187×24 (matches SmallSystemFont height), inline with worker version row; pull workerVer width to 1640 to avoid overlap |

@@ -6,32 +6,38 @@ sub init()
         {
             id: "nyc", name: "New York", sub: "MTA SUBWAY",
             img: "pkg:/images/map_nyc.jpg",
-            bounds: {minLon: -74.336, maxLon: -73.676, minLat: 40.572, maxLat: 40.853}
+            bounds: {minLon: -74.336, maxLon: -73.676, minLat: 40.572, maxLat: 40.853},
+            tzBase: -5, dst: 1, tzName: "ET"
         },
         {
             id: "paris", name: "Paris", sub: "RATP METRO",
             img: "pkg:/images/map_paris.jpg",
-            bounds: {minLon: 2.017, maxLon: 2.677, minLat: 48.738, maxLat: 48.982}
+            bounds: {minLon: 2.017, maxLon: 2.677, minLat: 48.738, maxLat: 48.982},
+            tzBase: 1, dst: 1, tzName: "CET"
         },
         {
             id: "helsinki", name: "Helsinki", sub: "HSL TRANSIT",
             img: "pkg:/images/map_helsinki.jpg",
-            bounds: {minLon: 24.610, maxLon: 25.270, minLat: 60.078, maxLat: 60.262}
+            bounds: {minLon: 24.610, maxLon: 25.270, minLat: 60.078, maxLat: 60.262},
+            tzBase: 2, dst: 1, tzName: "EET"
         },
         {
             id: "sydney", name: "Sydney", sub: "TFNSW TRAINS",
             img: "pkg:/images/map_sydney.jpg",
-            bounds: {minLon: 150.880, maxLon: 151.540, minLat: -34.024, maxLat: -33.716}
+            bounds: {minLon: 150.880, maxLon: 151.540, minLat: -34.024, maxLat: -33.716},
+            tzBase: 10, dst: -1, tzName: "AEST"
         },
         {
             id: "tokyo", name: "Tokyo", sub: "TOEI AND METRO",
             img: "pkg:/images/map_tokyo.jpg",
-            bounds: {minLon: 139.390, maxLon: 140.050, minLat: 35.539, maxLat: 35.840}
+            bounds: {minLon: 139.390, maxLon: 140.050, minLat: 35.539, maxLat: 35.840},
+            tzBase: 9, dst: 0, tzName: "JST"
         },
         {
             id: "seattle", name: "Seattle", sub: "SOUND TRANSIT",
             img: "pkg:/images/map_seattle.jpg",
-            bounds: {minLon: -122.660, maxLon: -122.000, minLat: 47.485, maxLat: 47.735}
+            bounds: {minLon: -122.660, maxLon: -122.000, minLat: 47.485, maxLat: 47.735},
+            tzBase: -8, dst: 1, tzName: "PT"
         }
     ]
 
@@ -57,6 +63,11 @@ sub switchCity(idx as Integer)
     m.top.findNode("cityName").text = city.name
     m.top.findNode("citySub").text = city.sub + "  Connecting..."
     m.top.findNode("workerVer").text = ""
+
+    m.top.findNode("topCityName").text = city.name
+    m.top.findNode("topSub").text = city.sub
+    m.top.findNode("topTrains").text = "Connecting..."
+    m.top.findNode("topTime").text = localTimeStr(city.tzBase, city.dst, city.tzName)
 
     clearDots()
 
@@ -85,17 +96,20 @@ sub onResult()
 
     if data = invalid
         m.top.findNode("citySub").text = city.sub + "  No response"
+        m.top.findNode("topTrains").text = "No response"
         return
     end if
 
     if data.fetchError <> invalid
         m.top.findNode("citySub").text = city.sub + "  ERR: " + data.fetchError
+        m.top.findNode("topTrains").text = "ERR: " + data.fetchError
         return
     end if
 
     trains = data.trains
     if trains = invalid
         m.top.findNode("citySub").text = city.sub + "  No trains field"
+        m.top.findNode("topTrains").text = "No trains field"
         return
     end if
 
@@ -127,6 +141,8 @@ sub onResult()
     totalStr   = Substitute(Str(total),   " ", "")
     visibleStr = Substitute(Str(visible), " ", "")
     m.top.findNode("citySub").text = city.sub + "  " + visibleStr + " / " + totalStr
+    m.top.findNode("topTrains").text = visibleStr + " / " + totalStr + " TRAINS ACTIVE"
+    m.top.findNode("topTime").text = localTimeStr(city.tzBase, city.dst, city.tzName)
 
     if data.workerVersion <> invalid
         m.top.findNode("workerVer").text = data.workerVersion
@@ -160,6 +176,35 @@ Function project(lat as Float, lon as Float, bounds as Object) as Object
     yMmax = mercY(bounds.maxLat)
     y = Int((1.0 - (yM - yMmin) / (yMmax - yMmin)) * 1080.0)
     return {x: x, y: y}
+End Function
+
+' Compute local wall-clock time for the given city timezone.
+' tzBase: UTC offset in standard time (e.g. -5 for ET, 9 for JST).
+' dst: 1 = northern hemisphere DST (+1h Apr-Oct), -1 = southern (+1h Oct-Apr), 0 = none.
+Function localTimeStr(tzBase as Integer, dst as Integer, tzName as String) as String
+    dt = CreateObject("roDateTime")
+    month = dt.GetMonth()
+    offset = tzBase
+    if dst = 1 and month >= 4 and month <= 10
+        offset = offset + 1
+    end if
+    if dst = -1
+        if month >= 10 or month <= 3
+            offset = offset + 1
+        end if
+    end if
+
+    h = (dt.GetHours() + offset + 48) mod 24
+    mn = dt.GetMinutes()
+
+    ampm = "AM"
+    if h >= 12 then ampm = "PM"
+    if h > 12  then h = h - 12
+    if h = 0   then h = 12
+
+    mStr = Str(mn).Trim()
+    if mn < 10 then mStr = "0" + mStr
+    return Str(h).Trim() + ":" + mStr + " " + ampm + "  " + tzName
 End Function
 
 Function onKeyEvent(key as String, press as Boolean) as Boolean
