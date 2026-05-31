@@ -1836,7 +1836,7 @@ function renderLegend() {
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────
-const VERSION='v4.21', LAST_EDIT='2026-05-31 · 13:09 PT';
+const VERSION='v4.22', LAST_EDIT='2026-05-31 · 13:20 PT';
 
 function toPT(isoString) {
   if (!isoString) return '—';
@@ -1939,6 +1939,22 @@ setTimeout(() => {
     WORKER_URL ? 'Connecting to MTA…' : 'Simulated · Deploy worker for live data (no API key needed)';
 }, 1500);
 requestAnimationFrame(loop);
+
+// ── OLED burn-in protection — pixel shift ─────────────────────────────────────
+// Cycles body through a 9-position ±3px grid every 3 minutes.
+// Shift is imperceptible at TV viewing distance but prevents static UI
+// elements (logo, topbar, legend, version stamps) from burning in.
+// CSS transition makes each move invisible even up close.
+(function() {
+  var positions = [[0,0],[3,0],[3,3],[0,3],[-3,3],[-3,0],[-3,-3],[0,-3],[2,-2]];
+  var idx = 0;
+  document.body.style.transition = 'transform 2s ease';
+  setInterval(function() {
+    idx = (idx + 1) % positions.length;
+    var p = positions[idx];
+    document.body.style.transform = 'translate(' + p[0] + 'px,' + p[1] + 'px)';
+  }, 3 * 60 * 1000);
+})();
 </script>
 </body>
 </html>
