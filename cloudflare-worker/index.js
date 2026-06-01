@@ -15,7 +15,8 @@ function parseTs(s) {
   return v;
 }
 
-const WORKER_VERSION = 'w4.10';
+const WORKER_VERSION = 'w4.11';
+const WORKER_BUILT   = '2026-05-31';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -1259,7 +1260,7 @@ export default {
       if (hit) return hit;
       try {
         const trains = await fetchAllMTATrains();
-        const body   = JSON.stringify({ city:'nyc', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'nyc', workerVersion:WORKER_VERSION, workerBuilt:WORKER_BUILT, count:trains.length, updatedAt:new Date().toISOString(), trains });
         const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=30');
         const staleResp = resp.clone();
@@ -1290,7 +1291,7 @@ export default {
       _tsCache.clear();
       try {
         const trains = await fetchParisTrains(key);
-        const body   = JSON.stringify({ city:'paris', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'paris', workerVersion:WORKER_VERSION, workerBuilt:WORKER_BUILT, count:trains.length, updatedAt:new Date().toISOString(), trains });
         const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=120');
         const staleResp = resp.clone();
@@ -1346,7 +1347,7 @@ if (path === '/trains/seattle') {
       if (hit) return hit;
       try {
         const trains = await fetchSeattleTrains(key);
-        const body   = JSON.stringify({ city:'seattle', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'seattle', workerVersion:WORKER_VERSION, workerBuilt:WORKER_BUILT, count:trains.length, updatedAt:new Date().toISOString(), trains });
         const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=15');
         const staleResp = resp.clone();
@@ -1426,7 +1427,7 @@ if (path === '/trains/seattle') {
       if (hit) return hit;
       try {
         const trains = await fetchHelsinkiTrains();
-        const body   = JSON.stringify({ city:'helsinki', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'helsinki', workerVersion:WORKER_VERSION, workerBuilt:WORKER_BUILT, count:trains.length, updatedAt:new Date().toISOString(), trains });
         const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=15');
         const staleResp = resp.clone();
@@ -1452,7 +1453,7 @@ if (path === '/trains/seattle') {
       if (hit) return hit;
       try {
         const trains = await fetchSydneyTrains(key);
-        const body   = JSON.stringify({ city:'sydney', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'sydney', workerVersion:WORKER_VERSION, workerBuilt:WORKER_BUILT, count:trains.length, updatedAt:new Date().toISOString(), trains });
         const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=15');
         const staleResp = resp.clone();
@@ -1478,7 +1479,7 @@ if (path === '/trains/seattle') {
       if (hit) return hit;
       try {
         const trains = await fetchTokyoTrains(key);
-        const body   = JSON.stringify({ city:'tokyo', workerVersion:WORKER_VERSION, count:trains.length, updatedAt:new Date().toISOString(), trains });
+        const body   = JSON.stringify({ city:'tokyo', workerVersion:WORKER_VERSION, workerBuilt:WORKER_BUILT, count:trains.length, updatedAt:new Date().toISOString(), trains });
         const resp   = new Response(body, { headers: { 'Content-Type':'application/json', ...CORS } });
         resp.headers.append('Cache-Control', 'public, max-age=30');
         const staleResp = resp.clone();

@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-31 · 18:00 PT
-> **Prototype version:** v4.22 · **Worker version:** w4.10 · **Roku version:** r1.3
+> **Last updated:** 2026-05-31 · 18:12 PT
+> **Prototype version:** v4.22 · **Worker version:** w4.11 · **Roku version:** r1.4
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev
@@ -366,6 +366,8 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-31 | w4.11 | Worker: add WORKER_BUILT constant, include workerBuilt in all train responses |
+| 2026-05-31 | r1.4 | Roku: fix city-switching freeze — re-assert focusTrap focus after every city switch and data fetch; null guards for t.id/lat/lng; Courier New 12pt stamps; workerBuilt date in worker stamp |
 | 2026-05-31 | r1.3 | Roku: fix station glow — worker sends "AT_STOP"/"INCOMING", not "STOPPED_AT"/"INCOMING_AT"; string mismatch meant glow never fired |
 | 2026-05-31 | r1.2 | Roku: three stacked version stamps bottom-right (roku/app/worker), SmallestSystemFont; worker stamp converts updatedAt ISO→PT via updatedAtPT() |
 | 2026-05-31 | r1.1 | Roku: bottom bar as overlay — remove bottomBar rectangle, cityName, citySub; nav hint + build numbers float over map |

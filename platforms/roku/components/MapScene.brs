@@ -1,7 +1,7 @@
 sub init()
     m.WORKER = "https://transitmap.marcboyer-public.workers.dev"
     m.FETCH_INTERVAL = 30
-    m.ROKU_VERSION = "r1.3"
+    m.ROKU_VERSION = "r1.4"
     m.ROKU_BUILT   = "2026-05-31 PT"
     m.APP_VERSION  = "v4.22"
     m.APP_BUILT    = "2026-05-31 · 13:20 PT"
@@ -90,6 +90,7 @@ sub switchCity(idx as Integer)
     m.fetchTimer.control = "stop"
     startFetch()
     m.fetchTimer.control = "start"
+    m.top.findNode("focusTrap").setFocus(true)
 end sub
 
 sub onFetchTimer()
@@ -156,8 +157,10 @@ sub onResult()
     visible = 0
 
     for each t in trains
+        if t.id = invalid then goto skipTrain
         lat = t.lat
         lon = t.lng
+        if lat = invalid or lon = invalid then goto skipTrain
         inBounds = (lon >= bounds.minLon and lon <= bounds.maxLon and lat >= bounds.minLat and lat <= bounds.maxLat)
         if inBounds
             p = project(lat, lon, bounds)
@@ -220,6 +223,7 @@ sub onResult()
                 end if
             end if
         end if
+        skipTrain:
     end for
 
     ' Remove dots for trains that left the viewport this cycle
@@ -250,12 +254,13 @@ sub onResult()
     m.top.findNode("topTime").text = localTimeStr(city.tzBase, city.dst, city.tzName)
 
     if data.workerVersion <> invalid
-        wrkTime = ""
-        if data.updatedAt <> invalid
-            wrkTime = " · " + updatedAtPT(data.updatedAt)
+        wrkBuilt = ""
+        if data.workerBuilt <> invalid
+            wrkBuilt = " · " + data.workerBuilt + " PT"
         end if
-        m.top.findNode("wrkStamp").text = "worker " + data.workerVersion + wrkTime
+        m.top.findNode("wrkStamp").text = "worker " + data.workerVersion + wrkBuilt
     end if
+    m.top.findNode("focusTrap").setFocus(true)
 end sub
 
 sub clearTrains()

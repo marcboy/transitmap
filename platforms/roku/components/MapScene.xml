@@ -50,30 +50,33 @@
            color="0xFFFFFF44"
            text="&lt; &gt;  change city"/>
 
-    <!-- Version stamps — stacked bottom-right, left of logo -->
+    <!-- Version stamps — stacked bottom-right, left of logo, small monospace font -->
     <Label id="rokStamp"
-           translation="[0, 968]"
+           translation="[0, 966]"
            width="1680"
            horizAlign="right"
-           font="font:SmallestSystemFont"
            color="0xFFFFFF55"
-           text=""/>
+           text="">
+      <Font role="font" uri="pkg:/fonts/CourierNew.ttf" size="12"/>
+    </Label>
 
     <Label id="appStamp"
-           translation="[0, 986]"
+           translation="[0, 982]"
            width="1680"
            horizAlign="right"
-           font="font:SmallestSystemFont"
            color="0xFFFFFF55"
-           text=""/>
+           text="">
+      <Font role="font" uri="pkg:/fonts/CourierNew.ttf" size="12"/>
+    </Label>
 
     <Label id="wrkStamp"
-           translation="[0, 1004]"
+           translation="[0, 998]"
            width="1680"
            horizAlign="right"
-           font="font:SmallestSystemFont"
            color="0xFFFFFF55"
-           text=""/>
+           text="">
+      <Font role="font" uri="pkg:/fonts/CourierNew.ttf" size="12"/>
+    </Label>
 
     <!-- 6-KIDS logo — bottom-right, same line as worker version -->
     <Poster id="logoImg"
