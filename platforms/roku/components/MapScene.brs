@@ -1,6 +1,7 @@
 sub init()
     m.WORKER = "https://transitmap.marcboyer-public.workers.dev"
     m.FETCH_INTERVAL = 30
+    m.ROKU_VERSION = "r1.0"
 
     m.cities = [
         {
@@ -73,7 +74,7 @@ sub switchCity(idx as Integer)
     m.top.findNode("mapBg").uri = city.img
     m.top.findNode("cityName").text = city.name
     m.top.findNode("citySub").text = city.sub + "  Connecting..."
-    m.top.findNode("workerVer").text = ""
+    m.top.findNode("workerVer").text = m.ROKU_VERSION
 
     m.top.findNode("topCityName").text = city.name
     m.top.findNode("topSub").text = city.sub
@@ -249,7 +250,7 @@ sub onResult()
     m.top.findNode("topTime").text = localTimeStr(city.tzBase, city.dst, city.tzName)
 
     if data.workerVersion <> invalid
-        m.top.findNode("workerVer").text = data.workerVersion
+        m.top.findNode("workerVer").text = m.ROKU_VERSION + " · " + data.workerVersion
     end if
 end sub
 

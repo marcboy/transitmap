@@ -38,6 +38,9 @@ done
 ```
 (Cloudflare purges the edge cache on every deploy. KV survives deployments but takes one successful compute to populate after a cold start.)
 
+### Roku build version
+Every time any Roku file is changed (`platforms/roku/**`), bump `ROKU_VERSION` in `platforms/roku/components/MapScene.brs` (e.g. `"r1.0"` → `"r1.1"`). Also update the **Roku version** field in the HANDOFF.md header. Rebuild `platforms/TransitMap-roku.zip` as part of the same commit.
+
 ### Commit messages
 Always end git commit messages with:
 ```

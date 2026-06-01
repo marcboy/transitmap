@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-31 · 17:39 PT
-> **Prototype version:** v4.22 · **Worker version:** w4.10
+> **Last updated:** 2026-05-31 · 17:40 PT
+> **Prototype version:** v4.22 · **Worker version:** w4.10 · **Roku version:** r1.0
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev
@@ -366,6 +366,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-31 | r1.0 | Roku: add ROKU_VERSION stamp (r1.0) shown next to worker version; bumped on every Roku change; rule added to CLAUDE.md |
 | 2026-05-31 | — | Roku: top-left info panel as map overlay — removed solid topBar rectangle, text floats directly over dark map |
 | 2026-05-31 | — | Roku: fix top-left panel visibility — push labels down 28px into safe zone (topCityName y=80), add explicit width=1760; was clipped by TV overscan at y=52 |
 | 2026-05-31 | — | Roku: smooth train animation (1s interpolation timer, fromX/fromY→toX/toY over 30 steps) + station glow ring (SmallSystemFont circle, 47% opacity, appended before dot) |
