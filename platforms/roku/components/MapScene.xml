@@ -12,10 +12,7 @@
     <!-- Train dots appended here dynamically -->
     <Group id="trainLayer"/>
 
-    <!-- Top-left info panel (city name, train count, local time) -->
-    <Rectangle id="topBar" width="1920" height="260"
-               translation="[0, 0]" color="0x080C14F0"/>
-
+    <!-- Top-left info panel (city name, train count, local time) — overlay, no background -->
     <Label id="topCityName"
            translation="[80, 80]"
            width="1760"
