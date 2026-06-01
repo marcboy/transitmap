@@ -41,24 +41,6 @@
            color="0xFFFFFF66"
            text=""/>
 
-    <!-- Bottom gradient bar -->
-    <Rectangle id="bottomBar" width="1920" height="130"
-               translation="[0, 950]" color="0x04080EF0"/>
-
-    <!-- City name (large, bottom-left) -->
-    <Label id="cityName"
-           translation="[80, 958]"
-           font="font:LargeBoldSystemFont"
-           color="0xFFFFFFFF"
-           text=""/>
-
-    <!-- System + train count (small, below city name) -->
-    <Label id="citySub"
-           translation="[80, 1008]"
-           font="font:SmallSystemFont"
-           color="0xFFFFFF99"
-           text=""/>
-
     <!-- Nav hint (center) -->
     <Label id="navHint"
            translation="[0, 1008]"

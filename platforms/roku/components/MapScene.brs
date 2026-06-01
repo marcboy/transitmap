@@ -1,7 +1,7 @@
 sub init()
     m.WORKER = "https://transitmap.marcboyer-public.workers.dev"
     m.FETCH_INTERVAL = 30
-    m.ROKU_VERSION = "r1.0"
+    m.ROKU_VERSION = "r1.1"
 
     m.cities = [
         {
@@ -72,8 +72,6 @@ sub switchCity(idx as Integer)
     city = m.cities[idx]
 
     m.top.findNode("mapBg").uri = city.img
-    m.top.findNode("cityName").text = city.name
-    m.top.findNode("citySub").text = city.sub + "  Connecting..."
     m.top.findNode("workerVer").text = m.ROKU_VERSION
 
     m.top.findNode("topCityName").text = city.name
@@ -129,20 +127,17 @@ sub onResult()
     city = m.cities[m.cityIdx]
 
     if data = invalid
-        m.top.findNode("citySub").text = city.sub + "  No response"
         m.top.findNode("topTrains").text = "No response"
         return
     end if
 
     if data.fetchError <> invalid
-        m.top.findNode("citySub").text = city.sub + "  ERR: " + data.fetchError
         m.top.findNode("topTrains").text = "ERR: " + data.fetchError
         return
     end if
 
     trains = data.trains
     if trains = invalid
-        m.top.findNode("citySub").text = city.sub + "  No trains field"
         m.top.findNode("topTrains").text = "No trains field"
         return
     end if
@@ -245,7 +240,6 @@ sub onResult()
 
     totalStr = Substitute(Str(total), " ", "")
     visibleStr = Substitute(Str(visible), " ", "")
-    m.top.findNode("citySub").text = city.sub + "  " + visibleStr + " / " + totalStr
     m.top.findNode("topTrains").text = visibleStr + " / " + totalStr + " TRAINS ACTIVE"
     m.top.findNode("topTime").text = localTimeStr(city.tzBase, city.dst, city.tzName)
 
