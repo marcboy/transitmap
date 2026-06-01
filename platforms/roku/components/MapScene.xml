@@ -50,13 +50,29 @@
            color="0xFFFFFF44"
            text="&lt; &gt;  change city"/>
 
-    <!-- Worker version (right of center, logo sits to its right) -->
-    <Label id="workerVer"
-           translation="[0, 1008]"
-           width="1640"
+    <!-- Version stamps — stacked bottom-right, left of logo -->
+    <Label id="rokStamp"
+           translation="[0, 968]"
+           width="1680"
            horizAlign="right"
-           font="font:SmallSystemFont"
-           color="0xFFFFFF44"
+           font="font:SmallestSystemFont"
+           color="0xFFFFFF55"
+           text=""/>
+
+    <Label id="appStamp"
+           translation="[0, 986]"
+           width="1680"
+           horizAlign="right"
+           font="font:SmallestSystemFont"
+           color="0xFFFFFF55"
+           text=""/>
+
+    <Label id="wrkStamp"
+           translation="[0, 1004]"
+           width="1680"
+           horizAlign="right"
+           font="font:SmallestSystemFont"
+           color="0xFFFFFF55"
            text=""/>
 
     <!-- 6-KIDS logo — bottom-right, same line as worker version -->

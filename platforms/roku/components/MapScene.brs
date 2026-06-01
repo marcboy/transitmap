@@ -1,7 +1,10 @@
 sub init()
     m.WORKER = "https://transitmap.marcboyer-public.workers.dev"
     m.FETCH_INTERVAL = 30
-    m.ROKU_VERSION = "r1.1"
+    m.ROKU_VERSION = "r1.2"
+    m.ROKU_BUILT   = "2026-05-31 PT"
+    m.APP_VERSION  = "v4.22"
+    m.APP_BUILT    = "2026-05-31 · 13:20 PT"
 
     m.cities = [
         {
@@ -63,6 +66,9 @@ sub init()
     m.animTimer.observeField("fire", "onAnimTick")
     m.animTimer.control = "start"
 
+    m.top.findNode("rokStamp").text = "roku  " + m.ROKU_VERSION + " · " + m.ROKU_BUILT
+    m.top.findNode("appStamp").text = "app   " + m.APP_VERSION  + " · " + m.APP_BUILT
+
     m.top.findNode("focusTrap").setFocus(true)
     switchCity(0)
 end sub
@@ -72,7 +78,7 @@ sub switchCity(idx as Integer)
     city = m.cities[idx]
 
     m.top.findNode("mapBg").uri = city.img
-    m.top.findNode("workerVer").text = m.ROKU_VERSION
+    m.top.findNode("wrkStamp").text = ""
 
     m.top.findNode("topCityName").text = city.name
     m.top.findNode("topSub").text = city.sub
@@ -244,7 +250,11 @@ sub onResult()
     m.top.findNode("topTime").text = localTimeStr(city.tzBase, city.dst, city.tzName)
 
     if data.workerVersion <> invalid
-        m.top.findNode("workerVer").text = m.ROKU_VERSION + " · " + data.workerVersion
+        wrkTime = ""
+        if data.updatedAt <> invalid
+            wrkTime = " · " + updatedAtPT(data.updatedAt)
+        end if
+        m.top.findNode("wrkStamp").text = "worker " + data.workerVersion + wrkTime
     end if
 end sub
 
@@ -315,6 +325,25 @@ Function project(lat as Float, lon as Float, bounds as Object) as Object
     yMmax = mercY(bounds.maxLat)
     y = Int((1.0 - (yM - yMmin) / (yMmax - yMmin)) * 1080.0)
     return {x: x, y: y}
+End Function
+
+' Parse ISO timestamp "2026-05-31T17:42:00.000Z" → "5:42 PM PT"
+Function updatedAtPT(isoStr as String) as String
+    if isoStr = invalid or Len(isoStr) < 16 then return ""
+    h  = Val(Mid(isoStr, 12, 2))
+    mn = Val(Mid(isoStr, 15, 2))
+    dt = CreateObject("roDateTime")
+    month = dt.GetMonth()
+    offset = -8
+    if month >= 3 and month <= 11 then offset = -7
+    h = (h + offset + 48) mod 24
+    ampm = "AM"
+    if h >= 12 then ampm = "PM"
+    if h > 12  then h = h - 12
+    if h = 0   then h = 12
+    mStr = Str(mn).Trim()
+    if mn < 10 then mStr = "0" + mStr
+    return Str(h).Trim() + ":" + mStr + " " + ampm + " PT"
 End Function
 
 Function onKeyEvent(key as String, press as Boolean) as Boolean
