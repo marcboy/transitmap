@@ -1,6 +1,6 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-31 · 16:03 PT
+> **Last updated:** 2026-05-31 · 16:46 PT
 > **Prototype version:** v4.22 · **Worker version:** w4.10
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
@@ -366,6 +366,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-31 | — | Roku: fix top-left panel visibility — push labels down 28px into safe zone (topCityName y=80), add explicit width=1760; was clipped by TV overscan at y=52 |
 | 2026-05-31 | — | Roku: smooth train animation (1s interpolation timer, fromX/fromY→toX/toY over 30 steps) + station glow ring (SmallSystemFont circle, 47% opacity, appended before dot) |
 | 2026-05-31 | — | Roku: add top-left info panel — city name (LargeBold), system name, train count, local time with per-city timezone (tzBase+DST); localTimeStr() function |
 | 2026-05-31 | — | LG webOS: bump city name 56px, city-sub 20px, train count 36px, line chips 16px, fetch-log 14px at top:260px right:80px (below topbar, always visible) |
