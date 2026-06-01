@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-31 · 19:09 PT
-> **Prototype version:** v4.22 · **Worker version:** w4.11 · **Roku version:** r1.6
+> **Last updated:** 2026-05-31 · 19:33 PT
+> **Prototype version:** v4.22 · **Worker version:** w4.11 · **Roku version:** r1.7
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev
@@ -366,6 +366,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-31 | r1.7 | Roku: GTFS routes for Helsinki (75), Sydney (96, viewport-filtered), Seattle (9) — maps regenerated with accurate track geometry; replaces simplified prototype polylines |
 | 2026-05-31 | w4.11 | Worker: add WORKER_BUILT constant, include workerBuilt in all train responses |
 | 2026-05-31 | r1.6 | Roku: NYC map regenerated from MTA GTFS shapes.txt — 81 routes/branches, 15K points, accurate track geometry; replaces 25 simplified prototype polylines |
 | 2026-05-31 | r1.5 | Roku: fix city selector after failed fetch — move focusTrap.setFocus to top of onResult() so ALL return paths (error, timeout, invalid) re-assert focus |

@@ -1,10 +1,10 @@
 sub init()
     m.WORKER = "https://transitmap.marcboyer-public.workers.dev"
     m.FETCH_INTERVAL = 30
-    m.ROKU_VERSION = "r1.6"
+    m.ROKU_VERSION = "r1.7"
     m.ROKU_BUILT   = "2026-05-31 PT"
     m.APP_VERSION  = "v4.22"
-    m.APP_BUILT    = "2026-05-31 · 13:20 PT"
+    m.APP_BUILT    = "2026-05-31 · 19:33 PT"
 
     m.cities = [
         {
