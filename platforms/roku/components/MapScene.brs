@@ -1,7 +1,7 @@
 sub init()
     m.WORKER = "https://transitmap.marcboyer-public.workers.dev"
     m.FETCH_INTERVAL = 30
-    m.ROKU_VERSION = "r1.2"
+    m.ROKU_VERSION = "r1.3"
     m.ROKU_BUILT   = "2026-05-31 PT"
     m.APP_VERSION  = "v4.22"
     m.APP_BUILT    = "2026-05-31 · 13:20 PT"
@@ -167,7 +167,7 @@ sub onResult()
 
             atStop = false
             if t.status <> invalid
-                if t.status = "STOPPED_AT" or t.status = "INCOMING_AT"
+                if t.status = "AT_STOP" or t.status = "INCOMING"
                     atStop = true
                 end if
             end if

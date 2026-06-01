@@ -1,7 +1,7 @@
 # TransitMap — Handoff Document
 
-> **Last updated:** 2026-05-31 · 17:55 PT
-> **Prototype version:** v4.22 · **Worker version:** w4.10 · **Roku version:** r1.2
+> **Last updated:** 2026-05-31 · 18:00 PT
+> **Prototype version:** v4.22 · **Worker version:** w4.10 · **Roku version:** r1.3
 > **Repo:** https://github.com/marcboy/transitmap
 > **Live prototype:** https://marcboy.github.io/transitmap/
 > **Cloudflare Worker:** https://transitmap.marcboyer-public.workers.dev
@@ -366,6 +366,7 @@ wrangler secret put OBA_API_KEY
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-05-31 | r1.3 | Roku: fix station glow — worker sends "AT_STOP"/"INCOMING", not "STOPPED_AT"/"INCOMING_AT"; string mismatch meant glow never fired |
 | 2026-05-31 | r1.2 | Roku: three stacked version stamps bottom-right (roku/app/worker), SmallestSystemFont; worker stamp converts updatedAt ISO→PT via updatedAtPT() |
 | 2026-05-31 | r1.1 | Roku: bottom bar as overlay — remove bottomBar rectangle, cityName, citySub; nav hint + build numbers float over map |
 | 2026-05-31 | r1.0 | Roku: add ROKU_VERSION stamp (r1.0) shown next to worker version; bumped on every Roku change; rule added to CLAUDE.md |
